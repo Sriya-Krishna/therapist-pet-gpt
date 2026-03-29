@@ -107,6 +107,15 @@ export default function App() {
     }
   }
 
+  const scheduleSession = async (patientId) => {
+    if (!backendAvailable) return
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const dateStr = tomorrow.toISOString().split('T')[0]
+    await api.createAppointment(patientId, dateStr, '10:00', '10:50').catch(() => {})
+    alert(`Session scheduled for ${dateStr} at 10:00 AM`)
+  }
+
   const goToAgent = (patientId) => {
     setEditingAgentFor(patientId)
     setView('agents')
@@ -158,6 +167,7 @@ export default function App() {
                     patient={selected}
                     signals={signals.filter(s => s.patientId === selected.id)}
                     onConfigureAgent={() => goToAgent(selected.id)}
+                    onSchedule={() => scheduleSession(selected.id)}
                   />
                 </>
               ) : (

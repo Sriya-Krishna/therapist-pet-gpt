@@ -83,3 +83,10 @@ export function getAppointments(date) {
   const qs = date ? `?date=${date}` : ''
   return request(`/appointments${qs}`)
 }
+
+export function createAppointment(patientId, date, startTime, endTime, type = 'Session') {
+  return request('/appointments', {
+    method: 'POST',
+    body: JSON.stringify({ patientId, date, startTime, endTime, type }),
+  })
+}

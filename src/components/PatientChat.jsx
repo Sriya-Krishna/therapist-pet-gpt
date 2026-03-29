@@ -272,8 +272,22 @@ export default function PatientChat({ patientModeUser, backendAvailable, onRegis
     }
   }
 
-  const bookSlot = (date, slot) => {
-    setBookedSlot({ date, slot })
+  const bookSlot = (day, slot) => {
+    setBookedSlot({ date: day, slot })
+
+    // Persist to backend
+    if (backendAvailable && patientModeUser) {
+      const dateStr = `${cal.year}-${String(cal.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      // Parse "9:00 AM" → "09:00", add 50 min for end
+      const [time, ampm] = slot.split(' ')
+      const [h, m] = time.split(':').map(Number)
+      const hour24 = ampm === 'PM' && h !== 12 ? h + 12 : ampm === 'AM' && h === 12 ? 0 : h
+      const start = `${String(hour24).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+      const endH = hour24 + (m + 50 >= 60 ? 1 : 0)
+      const endM = (m + 50) % 60
+      const end = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
+      api.createAppointment(patientModeUser, dateStr, start, end).catch(() => {})
+    }
   }
 
   const calCells = []

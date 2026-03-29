@@ -15,7 +15,7 @@
 import { Bot, CalendarPlus } from 'lucide-react'
 import { patientStatusText, signalDot } from '../constants/statusColors'
 
-export default function ContextPanel({ patient, signals, onConfigureAgent }) {
+export default function ContextPanel({ patient, signals, onConfigureAgent, onSchedule }) {
   return (
     <aside className="w-80 border-l border-stone-200/70 bg-white overflow-y-auto shrink-0">
       <div className="px-5 py-4 border-b border-stone-100">
@@ -108,7 +108,10 @@ export default function ContextPanel({ patient, signals, onConfigureAgent }) {
       )}
 
       <div className="px-5 py-4">
-        <button className="w-full flex items-center justify-center gap-1.5 text-[13px] text-stone-500 font-medium border border-stone-200 hover:bg-stone-50 rounded-lg px-3 py-2.5 transition-colors">
+        <button
+          onClick={onSchedule}
+          className="w-full flex items-center justify-center gap-1.5 text-[13px] text-stone-500 font-medium border border-stone-200 hover:bg-stone-50 rounded-lg px-3 py-2.5 transition-colors"
+        >
           <CalendarPlus size={14} />
           Schedule session
         </button>

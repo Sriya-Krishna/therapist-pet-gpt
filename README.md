@@ -59,7 +59,7 @@ Signals appear in the Signals feed and are used to auto-update patient status. S
 - Full conversation history loaded on mount and sent to the LLM on each request
 - Falls back to MockLLM with template-aware responses when no API key is set
 - Self-registration flow for new patients
-- Session scheduling UI (client-side mockup)
+- Session scheduling with backend persistence (`POST /api/appointments`)
 - 4 visual themes: Default, Floral, Starry Night, Enthusiastic
 
 ### Post-Chat Pipeline
@@ -80,9 +80,7 @@ Each step fails independently — a failed signal extraction or summary generati
 
 ## Not Yet Implemented
 
-- Real appointment booking (scheduler is a client-side mockup)
 - Authentication / user accounts
-- Conversation history truncation for long sessions
 
 ## Getting Started
 
