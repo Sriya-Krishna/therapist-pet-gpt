@@ -6,15 +6,15 @@ const navItems = [
   { id: 'signals', label: 'Signals', icon: Activity },
 ]
 
-export default function TopBar({ view, onNavigate, isPatientMode, onToggleMode, signalCount }) {
+export default function TopBar({ view, onNavigate, onGoHome, isPatientMode, onToggleMode, signalCount }) {
   return (
     <header className="h-14 bg-white border-b border-stone-200/70 flex items-center px-5 shrink-0">
-      <div className="flex items-center gap-2.5 mr-8">
+      <button onClick={onGoHome} className="flex items-center gap-2.5 mr-8 hover:opacity-80 transition-opacity">
         <div className="w-7 h-7 rounded-md bg-sage-500 flex items-center justify-center shadow-sm">
           <span className="text-white text-xs font-bold tracking-tight">M</span>
         </div>
         <span className="text-sm font-semibold text-stone-800 tracking-tight">MindBridge</span>
-      </div>
+      </button>
 
       {!isPatientMode && (
         <nav className="flex gap-0.5">

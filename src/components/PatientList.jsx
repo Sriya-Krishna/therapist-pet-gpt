@@ -1,3 +1,5 @@
+import { Plus } from 'lucide-react'
+
 const statusColors = {
   crisis: { border: 'border-l-red-500', text: 'text-red-700' },
   warning: { border: 'border-l-amber-500', text: 'text-amber-700' },
@@ -6,14 +8,22 @@ const statusColors = {
   new: { border: 'border-l-sky-400', text: 'text-sky-600' },
 }
 
-export default function PatientList({ patients, selectedId, onSelect, signals }) {
+export default function PatientList({ patients, selectedId, onSelect, signals, onAddPatient }) {
   const activeToday = patients.filter(p => p.lastActive.includes('Today')).length
   const unack = signals.filter(s => !s.acknowledged).length
 
   return (
     <aside className="w-72 border-r border-stone-200/70 bg-white flex flex-col shrink-0">
       <div className="px-4 py-3.5 border-b border-stone-100">
-        <div className="text-[13px] font-semibold text-stone-800">Patients</div>
+        <div className="flex items-center justify-between">
+          <div className="text-[13px] font-semibold text-stone-800">Patients</div>
+          <button
+            onClick={onAddPatient}
+            className="w-6 h-6 flex items-center justify-center rounded-md text-stone-400 hover:text-sage-700 hover:bg-sage-50 transition-colors"
+          >
+            <Plus size={14} />
+          </button>
+        </div>
         <div className="text-[11px] text-stone-400 mt-0.5">
           {unack} signal{unack !== 1 ? 's' : ''} &middot; {activeToday} active today
         </div>

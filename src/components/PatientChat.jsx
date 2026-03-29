@@ -45,7 +45,9 @@ function buildMonthAvailability() {
 
 const cal = buildMonthAvailability()
 
-export default function PatientChat() {
+export default function PatientChat({ patientModeUser, onRegister }) {
+  const [regName, setRegName] = useState('')
+  const [regIntro, setRegIntro] = useState('')
   const [messages, setMessages] = useState([
     { from: 'agent', text: 'Welcome back. How are you feeling today?' },
   ])
@@ -77,6 +79,67 @@ export default function PatientChat() {
 
   const selectedSlots = selectedDay ? (cal.slotMap[selectedDay] || []) : []
   const selectedDow = selectedDay ? DAY_HEADERS[new Date(cal.year, cal.month, selectedDay).getDay()] : ''
+
+  if (!patientModeUser) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center" style={{ background: '#FEFDFB' }}>
+        <div className="w-full max-w-sm px-4">
+          <div className="flex justify-center mb-6">
+            <div className="w-14 h-14 rounded-full bg-sage-200 animate-breathe" />
+          </div>
+
+          <div className="text-center mb-6">
+            <h1 className="text-base font-medium text-stone-600">Welcome to MindBridge</h1>
+            <p className="text-[12px] text-stone-400 mt-1">Tell us a little about yourself to get started</p>
+          </div>
+
+          <form onSubmit={(e) => {
+            e.preventDefault()
+            if (!regName.trim()) return
+            onRegister(regName.trim(), regIntro.trim())
+          }}>
+            <div className="mb-4">
+              <label className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider block mb-1.5">
+                Your name
+              </label>
+              <input
+                value={regName}
+                onChange={e => setRegName(e.target.value)}
+                placeholder="First and last name"
+                autoFocus
+                className="w-full text-[14px] border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sage-200 focus:border-sage-300 placeholder:text-stone-300 bg-white"
+              />
+            </div>
+
+            <div className="mb-5">
+              <label className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider block mb-1.5">
+                Brief intro <span className="font-normal normal-case tracking-normal text-stone-300">(optional)</span>
+              </label>
+              <textarea
+                value={regIntro}
+                onChange={e => setRegIntro(e.target.value)}
+                rows={3}
+                placeholder="What brings you here today?"
+                className="w-full text-[14px] border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sage-200 focus:border-sage-300 placeholder:text-stone-300 bg-white resize-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={!regName.trim()}
+              className="w-full text-[14px] font-medium text-white bg-sage-500 hover:bg-sage-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl px-5 py-3 transition-colors"
+            >
+              Get started
+            </button>
+
+            <p className="text-center text-[11px] text-stone-300 mt-4">
+              Everything here is between you and your care team
+            </p>
+          </form>
+        </div>
+      </div>
+    )
+  }
 
   if (showScheduler) {
     return (
