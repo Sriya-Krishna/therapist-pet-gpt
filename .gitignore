@@ -29,3 +29,7 @@ yarn-error.log*
 
 # Coverage
 coverage/
+
+# Backend
+backend/__pycache__/
+backend/*.db

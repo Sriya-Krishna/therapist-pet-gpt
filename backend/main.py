@@ -7,6 +7,9 @@ MindBridge API server.
     uvicorn main:app --reload --port 8000
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import json
 from datetime import datetime
 
@@ -184,7 +187,14 @@ def chat(patient_id: str, body: ChatMessage, db: Session = Depends(get_db)):
 
     agent = patient.get_agent()
     if not agent:
-        raise HTTPException(400, "No agent configured for this patient")
+        # Default agent so self-registered patients can chat immediately
+        agent = {
+            "templateId": "anchor",
+            "label": "Steady anchor",
+            "tone": {"warmth": 7, "directness": 4, "verbosity": 5},
+            "styles": ["Active listening", "Emotion validation"],
+            "boundaries": ["Escalate crisis signals to therapist immediately"],
+        }
 
     # Get master prompt
     setting = db.query(Setting).filter(Setting.key == "master_prompt").first()

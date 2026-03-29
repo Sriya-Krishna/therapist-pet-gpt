@@ -2,11 +2,13 @@
 LLM abstraction layer.
 
 Defines a simple interface for generating responses. Ships with a mock
-implementation. Swap in Claude/OpenAI by implementing `generate()`.
+implementation and an OpenAI-compatible implementation that reads
+OPENAI_API_BASE and OPENAI_API_KEY from the environment.
 """
 
-from abc import ABC, abstractmethod
+import os
 import random
+from abc import ABC, abstractmethod
 
 
 class LLMProvider(ABC):
@@ -23,6 +25,43 @@ class LLMProvider(ABC):
             The assistant's response text.
         """
         ...
+
+
+class OpenAILLM(LLMProvider):
+    """
+    OpenAI-compatible provider. Works with OpenAI, Azure OpenAI, LMStudio,
+    Ollama, or any API that follows the OpenAI chat completions format.
+
+    Env vars:
+        OPENAI_API_KEY   — API key (required)
+        OPENAI_API_BASE  — Base URL (default: https://api.openai.com/v1)
+        OPENAI_MODEL     — Model name (default: gpt-4o-mini)
+    """
+
+    def __init__(self):
+        import httpx
+        self.api_key = os.environ["OPENAI_API_KEY"]
+        self.base_url = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1").rstrip("/")
+        self.model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        self.client = httpx.Client(timeout=60)
+
+    def generate(self, system_prompt: str, messages: list[dict]) -> str:
+        full_messages = [{"role": "system", "content": system_prompt}] + messages
+        resp = self.client.post(
+            f"{self.base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": self.model,
+                "messages": full_messages,
+                "max_tokens": 512,
+                "temperature": 0.7,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
 
 
 class MockLLM(LLMProvider):
@@ -78,7 +117,6 @@ class MockLLM(LLMProvider):
     }
 
     def generate(self, system_prompt: str, messages: list[dict]) -> str:
-        # Detect template from system prompt to pick appropriate responses
         template_id = "_default"
         for tid in ("anchor", "structured", "reflective", "perspective", "soft"):
             if f"Therapeutic approach: {tid.capitalize()}" in system_prompt or \
@@ -91,20 +129,9 @@ class MockLLM(LLMProvider):
 
 
 # ── Active provider ────────────────────────────────────────────
-# Swap this to use a real LLM:
-#
-#   class ClaudeLLM(LLMProvider):
-#       def __init__(self, api_key: str):
-#           import anthropic
-#           self.client = anthropic.Anthropic(api_key=api_key)
-#
-#       def generate(self, system_prompt, messages):
-#           response = self.client.messages.create(
-#               model="claude-sonnet-4-20250514",
-#               max_tokens=512,
-#               system=system_prompt,
-#               messages=messages,
-#           )
-#           return response.content[0].text
+# Uses OpenAI-compatible API if OPENAI_API_KEY is set, otherwise MockLLM.
 
-llm = MockLLM()
+if os.environ.get("OPENAI_API_KEY"):
+    llm = OpenAILLM()
+else:
+    llm = MockLLM()
