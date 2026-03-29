@@ -189,6 +189,95 @@ def extract_signals(patient_message: str, agent_response: str, patient_name: str
         log.warning("Signal extraction failed for %s: %s", patient_id, e)
 
 
+# ── Post-chat summary generation ──────────────────────────────
+
+SUMMARY_PROMPT = """\
+You are a clinical summarization system for a therapist dashboard.
+Given a patient's recent conversation history, produce a concise clinical summary
+and a one-sentence recommendation for the therapist.
+
+Return ONLY a JSON object with two keys:
+{"summary": "2-4 sentence clinical summary", "recommendation": "one actionable sentence"}
+
+Focus on: emotional state, recurring themes, risk indicators, progress markers, and behavioral patterns.
+Write in third person, clinical but accessible tone. Do not include the patient's exact words unless quoting a critical phrase."""
+
+
+def update_patient_summary(patient, db):
+    """Regenerate the patient's AI summary from their conversation history.
+
+    Fails silently — summary generation must never break the chat flow.
+    """
+    if len(patient.messages) < 2:
+        return
+
+    try:
+        recent = patient.messages[-20:]  # last 20 messages for context
+        transcript = "\n".join(
+            f"{'Patient' if m.from_role == 'patient' else 'Agent'}: {m.text}"
+            for m in recent
+        )
+        messages = [{"role": "user", "content": (
+            f"Patient: {patient.name}\n"
+            f"Current status: {patient.status}\n\n"
+            f"Recent conversation:\n{transcript}\n\n"
+            "Generate a clinical summary and recommendation."
+        )}]
+        raw = llm.generate(SUMMARY_PROMPT, messages)
+
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+        result = json.loads(cleaned)
+        if isinstance(result, dict):
+            if "summary" in result:
+                patient.summary = result["summary"]
+            if "recommendation" in result:
+                patient.recommendation = result["recommendation"]
+            commit(db)
+            log.info("Updated summary for patient %s", patient.id)
+
+    except Exception as e:
+        log.warning("Summary generation failed for %s: %s", patient.id, e)
+
+
+# ── Patient status auto-update ────────────────────────────────
+
+def update_patient_status(patient, db):
+    """Update patient status based on recent signal history.
+
+    Status hierarchy: crisis > warning > active > quiet > new
+    - Any unacknowledged critical signal → crisis
+    - Any unacknowledged warning signal → warning
+    - Recent messages (active conversation) → active
+    - No recent messages → quiet
+    """
+    recent_signals = (
+        db.query(Signal)
+        .filter(Signal.patient_id == patient.id, Signal.acknowledged == False)
+        .all()
+    )
+
+    signal_types = {s.type for s in recent_signals}
+
+    if "critical" in signal_types:
+        new_status = "crisis"
+    elif "warning" in signal_types:
+        new_status = "warning"
+    elif patient.last_active and "Today" in patient.last_active:
+        new_status = "active"
+    elif patient.status == "new" and len(patient.messages) == 0:
+        new_status = "new"
+    else:
+        new_status = "quiet" if patient.status != "new" else "active"
+
+    if new_status != patient.status:
+        log.info("Patient %s status: %s → %s", patient.id, patient.status, new_status)
+        patient.status = new_status
+        commit(db)
+
+
 # ── Boundary enforcement (verifier LLM) ───────────────────────
 
 BOUNDARY_VERIFY_PROMPT = """\
@@ -442,7 +531,7 @@ def chat(patient_id: str, body: ChatMessage, db: Session = Depends(get_db)):
     patient.last_active = f"Today, {time_str}"
     commit(db)
 
-    # ── Extract clinical signals (non-blocking — never breaks chat) ──
+    # ── Post-chat analysis (all non-blocking — never breaks chat) ──
     extract_signals(
         patient_message=body.text,
         agent_response=response_text,
@@ -452,6 +541,8 @@ def chat(patient_id: str, body: ChatMessage, db: Session = Depends(get_db)):
         time_str=time_str,
         date_str=date_str,
     )
+    update_patient_status(patient, db)
+    update_patient_summary(patient, db)
 
     return {
         "response": response_text,

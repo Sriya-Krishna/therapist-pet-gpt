@@ -134,6 +134,10 @@ class MockLLM(LLMProvider):
         if "clinical safety auditor" in system_prompt.lower():
             return self._mock_boundary_check(messages)
 
+        # Summary generation calls
+        if "clinical summarization system" in system_prompt.lower():
+            return self._mock_summary(messages)
+
         template_id = "_default"
         for tid in ("anchor", "structured", "reflective", "perspective", "soft"):
             if f"Therapeutic approach: {tid.capitalize()}" in system_prompt or \
@@ -143,6 +147,15 @@ class MockLLM(LLMProvider):
 
         pool = self.RESPONSES.get(template_id, self.RESPONSES["_default"])
         return random.choice(pool)
+
+    def _mock_summary(self, messages: list[dict]) -> str:
+        """Generate a mock clinical summary from the conversation."""
+        summaries = [
+            {"summary": "Patient is engaging consistently and showing willingness to explore emotional topics. Conversation patterns suggest moderate anxiety with increasing self-awareness. Recent exchanges indicate a shift toward reflective processing.", "recommendation": "Continue current approach and monitor for emerging pattern recognition."},
+            {"summary": "Patient has been processing recent life events with fluctuating emotional intensity. Language suggests active coping but occasional avoidance of deeper themes. Engagement frequency is stable.", "recommendation": "Gently explore avoidance patterns in the next session."},
+            {"summary": "Patient shows signs of progress in emotional regulation. Recent messages demonstrate increased self-reflection and a willingness to sit with discomfort. Engagement has been consistent.", "recommendation": "Reinforce self-reflection gains and introduce gentle perspective-taking exercises."},
+        ]
+        return json.dumps(random.choice(summaries))
 
     def _mock_boundary_check(self, messages: list[dict]) -> str:
         """Parse boundaries from the message and return all-pass verdicts."""
