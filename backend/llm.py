@@ -12,6 +12,7 @@ The module-level `llm` instance is auto-selected at import time based on
 whether ANTHROPIC_API_KEY is set.
 """
 
+import json
 import os
 import random
 from abc import ABC, abstractmethod
@@ -125,6 +126,10 @@ class MockLLM(LLMProvider):
     }
 
     def generate(self, system_prompt: str, messages: list[dict]) -> str:
+        # Signal extraction calls use a different system prompt
+        if "signal extraction system" in system_prompt.lower():
+            return self._mock_signal_extraction(messages)
+
         template_id = "_default"
         for tid in ("anchor", "structured", "reflective", "perspective", "soft"):
             if f"Therapeutic approach: {tid.capitalize()}" in system_prompt or \
@@ -134,6 +139,20 @@ class MockLLM(LLMProvider):
 
         pool = self.RESPONSES.get(template_id, self.RESPONSES["_default"])
         return random.choice(pool)
+
+    def _mock_signal_extraction(self, messages: list[dict]) -> str:
+        """Return mock signals occasionally so the pipeline is testable."""
+        # ~30% chance of generating a signal for demo purposes
+        if random.random() > 0.3:
+            return "[]"
+        sig_type = random.choice(["positive", "info", "warning"])
+        samples = {
+            "positive": {"text": "Increased self-awareness observed", "detail": "Patient showed reflective engagement."},
+            "info": {"text": "New topic introduced in session", "detail": "Patient mentioned a recent life event."},
+            "warning": {"text": "Elevated emotional language detected", "detail": "Tone shift noted in latest message."},
+        }
+        sig = {"type": sig_type, **samples[sig_type]}
+        return json.dumps([sig])
 
 
 # ── Active provider ────────────────────────────────────────────

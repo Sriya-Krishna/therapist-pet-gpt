@@ -21,6 +21,7 @@ Run:
 from dotenv import load_dotenv
 load_dotenv()
 
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -107,6 +108,85 @@ DEFAULT_AGENT = {
     "styles": ["Active listening", "Emotion validation"],
     "boundaries": ["Escalate crisis signals to therapist immediately"],
 }
+
+
+# ── Signal extraction prompt ───────────────────────────────────
+
+SIGNAL_EXTRACTION_PROMPT = """\
+You are a clinical signal extraction system for a therapist dashboard.
+Analyze the patient's latest message and the agent's response for clinically
+relevant signals. Return a JSON array (may be empty) of signal objects.
+
+Signal categories:
+- "critical": Imminent risk markers — self-harm language, suicidal ideation, \
+  harm to others, acute crisis escalation. These demand immediate therapist attention.
+- "warning": Behavioral pattern shifts — sleep deterioration, substance nostalgia, \
+  social withdrawal, escalating avoidance, perfectionism deepening.
+- "positive": Therapeutic milestones — self-identified patterns, increased \
+  engagement, coping strategy use, emotional regulation improvement.
+- "info": Neutral observations — milestone dates, engagement frequency changes, \
+  new topics introduced.
+
+Only flag signals that are clinically meaningful. Most exchanges produce no signals.
+
+Return ONLY a JSON array, no other text. Each object must have:
+{"type": "critical|warning|positive|info", "text": "short summary", "detail": "supporting quote or context"}
+
+Example: [{"type": "warning", "text": "Sleep deterioration reported", "detail": "Two consecutive nights of 2-3 hours."}]
+If nothing is signal-worthy, return: []"""
+
+
+def extract_signals(patient_message: str, agent_response: str, patient_name: str,
+                    patient_id: str, db, time_str: str, date_str: str):
+    """Run a secondary LLM call to extract clinical signals from the exchange.
+
+    Fails silently — signal extraction must never break the chat flow.
+    """
+    try:
+        extraction_messages = [
+            {"role": "user", "content": (
+                f"Patient ({patient_name}) said: \"{patient_message}\"\n\n"
+                f"Agent responded: \"{agent_response}\"\n\n"
+                "Extract any clinical signals as a JSON array."
+            )}
+        ]
+        raw = llm.generate(SIGNAL_EXTRACTION_PROMPT, extraction_messages)
+
+        # Parse JSON — handle markdown code fences the LLM might wrap it in
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+        signals = json.loads(cleaned)
+
+        if not isinstance(signals, list):
+            log.warning("Signal extraction returned non-list: %s", type(signals))
+            return
+
+        for sig in signals:
+            if not isinstance(sig, dict):
+                continue
+            sig_type = sig.get("type", "info")
+            if sig_type not in ("critical", "warning", "positive", "info"):
+                sig_type = "info"
+            db.add(Signal(
+                patient_id=patient_id,
+                patient_name=patient_name,
+                type=sig_type,
+                text=sig.get("text", "Signal detected"),
+                detail=sig.get("detail", ""),
+                time=time_str,
+                date=date_str,
+            ))
+        if signals:
+            commit(db)
+            log.info("Extracted %d signal(s) for patient %s", len(signals), patient_id)
+
+    except json.JSONDecodeError as e:
+        log.warning("Signal extraction JSON parse failed for %s: %s (raw: %s)",
+                    patient_id, e, raw[:200] if 'raw' in dir() else "N/A")
+    except Exception as e:
+        log.warning("Signal extraction failed for %s: %s", patient_id, e)
 
 
 # ── Patients ───────────────────────────────────────────────────
@@ -224,9 +304,19 @@ def chat(patient_id: str, body: ChatMessage, db: Session = Depends(get_db)):
     patient.last_active = f"Today, {time_str}"
     commit(db)
 
+    # ── Extract clinical signals (non-blocking — never breaks chat) ──
+    extract_signals(
+        patient_message=body.text,
+        agent_response=response_text,
+        patient_name=patient.name,
+        patient_id=patient_id,
+        db=db,
+        time_str=time_str,
+        date_str=date_str,
+    )
+
     return {
         "response": response_text,
-        "systemPrompt": system_prompt,  # exposed for debugging — remove in prod
     }
 
 
