@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import TopBar from './components/TopBar'
 import PatientList from './components/PatientList'
 import Workspace from './components/Workspace'
@@ -8,49 +8,91 @@ import SignalsFeed from './components/SignalsFeed'
 import PatientChat from './components/PatientChat'
 import TherapistHome from './components/TherapistHome'
 import AddPatientModal from './components/AddPatientModal'
-import { patients as initialPatients, signals as initialSignals, defaultMasterPrompt } from './data/mock'
-
-function generatePatientId(name) {
-  return name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now().toString(36)
-}
-
-function deriveInitials(name) {
-  return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2)
-}
+import { patients as fallbackPatients, signals as fallbackSignals, defaultMasterPrompt } from './data/mock'
+import * as api from './api'
 
 export default function App() {
   const [view, setView] = useState('patients')
   const [selectedId, setSelectedId] = useState(null)
   const [isPatientMode, setIsPatientMode] = useState(false)
-  const [patients, setPatients] = useState(initialPatients)
-  const [signals, setSignals] = useState(initialSignals)
+  const [patients, setPatients] = useState([])
+  const [signals, setSignals] = useState([])
   const [editingAgentFor, setEditingAgentFor] = useState(null)
   const [showAddPatient, setShowAddPatient] = useState(false)
   const [patientModeUser, setPatientModeUser] = useState(null)
   const [masterPrompt, setMasterPrompt] = useState(defaultMasterPrompt)
+  const [backendAvailable, setBackendAvailable] = useState(false)
+
+  // ── Load from backend on mount, fall back to mock data ──────
+  useEffect(() => {
+    Promise.all([api.getPatients(), api.getSignals(), api.getMasterPrompt()])
+      .then(([p, s, mp]) => {
+        setPatients(p)
+        setSignals(s)
+        if (mp.prompt) setMasterPrompt(mp.prompt)
+        setBackendAvailable(true)
+      })
+      .catch(() => {
+        console.warn('Backend not available — using mock data')
+        setPatients(fallbackPatients)
+        setSignals(fallbackSignals)
+      })
+  }, [])
+
+  const refreshPatients = useCallback(() => {
+    if (!backendAvailable) return
+    api.getPatients().then(setPatients).catch(() => {})
+  }, [backendAvailable])
+
+  const refreshSignals = useCallback(() => {
+    if (!backendAvailable) return
+    api.getSignals().then(setSignals).catch(() => {})
+  }, [backendAvailable])
 
   const unacknowledged = signals.filter(s => !s.acknowledged).length
   const selected = patients.find(p => p.id === selectedId) || null
 
-  const acknowledge = (id) => {
+  const acknowledge = async (id) => {
     setSignals(prev => prev.map(s => s.id === id ? { ...s, acknowledged: true } : s))
+    if (backendAvailable) {
+      api.acknowledgeSignal(id).catch(() => {})
+    }
   }
 
-  const addPatient = (name, note = '') => {
-    const id = generatePatientId(name)
+  const addPatient = async (name, note = '') => {
+    if (backendAvailable) {
+      const created = await api.createPatient(name, note)
+      setPatients(prev => [...prev, created])
+      return created.id
+    }
+    // Fallback: local-only
+    const id = name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now().toString(36)
     const newPatient = {
-      id,
-      name,
-      initials: deriveInitials(name),
-      status: 'new',
-      lastActive: 'Not yet active',
-      agent: null,
+      id, name,
+      initials: name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2),
+      status: 'new', lastActive: 'Not yet active', agent: null,
       summary: note || `${name} was added. No sessions recorded yet.`,
       recommendation: 'Configure a sub-agent before the first automated check-in.',
       messages: [],
     }
     setPatients(prev => [...prev, newPatient])
     return id
+  }
+
+  const saveAgent = async (patientId, config) => {
+    if (backendAvailable) {
+      const updated = await api.updateAgent(patientId, config)
+      setPatients(prev => prev.map(p => p.id === patientId ? updated : p))
+    } else {
+      setPatients(prev => prev.map(p => p.id === patientId ? { ...p, agent: config } : p))
+    }
+  }
+
+  const saveMasterPrompt = async (prompt) => {
+    setMasterPrompt(prompt)
+    if (backendAvailable) {
+      api.updateMasterPrompt(prompt).catch(() => {})
+    }
   }
 
   const goToAgent = (patientId) => {
@@ -77,8 +119,9 @@ export default function App() {
       {isPatientMode ? (
         <PatientChat
           patientModeUser={patientModeUser}
-          onRegister={(name, intro) => {
-            const id = addPatient(name, intro)
+          backendAvailable={backendAvailable}
+          onRegister={async (name, intro) => {
+            const id = await addPatient(name, intro)
             setPatientModeUser(id)
           }}
         />
@@ -103,7 +146,11 @@ export default function App() {
                   />
                 </>
               ) : (
-                <TherapistHome masterPrompt={masterPrompt} onSaveMasterPrompt={setMasterPrompt} />
+                <TherapistHome
+                  masterPrompt={masterPrompt}
+                  onSaveMasterPrompt={saveMasterPrompt}
+                  backendAvailable={backendAvailable}
+                />
               )}
             </>
           )}
@@ -113,6 +160,7 @@ export default function App() {
               editingAgentFor={editingAgentFor}
               onEditAgent={setEditingAgentFor}
               onCloseEditor={() => setEditingAgentFor(null)}
+              onSaveAgent={saveAgent}
             />
           )}
           {view === 'signals' && (
@@ -123,8 +171,8 @@ export default function App() {
 
       {showAddPatient && (
         <AddPatientModal
-          onSubmit={(name, note) => {
-            const id = addPatient(name, note)
+          onSubmit={async (name, note) => {
+            const id = await addPatient(name, note)
             setSelectedId(id)
             setShowAddPatient(false)
           }}

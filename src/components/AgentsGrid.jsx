@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react'
 import AgentConfigurator from './AgentConfigurator'
 
-export default function AgentsGrid({ patients, editingAgentFor, onEditAgent, onCloseEditor }) {
+export default function AgentsGrid({ patients, editingAgentFor, onEditAgent, onCloseEditor, onSaveAgent }) {
   const configured = patients.filter(p => p.agent)
   const unconfigured = patients.filter(p => !p.agent)
   const editingPatient = editingAgentFor ? patients.find(p => p.id === editingAgentFor) : null
@@ -11,7 +11,10 @@ export default function AgentsGrid({ patients, editingAgentFor, onEditAgent, onC
       <AgentConfigurator
         patient={editingPatient}
         onBack={onCloseEditor}
-        onSave={onCloseEditor}
+        onSave={async (config) => {
+          if (onSaveAgent) await onSaveAgent(editingPatient.id, config)
+          onCloseEditor()
+        }}
       />
     )
   }

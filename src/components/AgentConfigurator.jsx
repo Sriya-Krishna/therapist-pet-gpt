@@ -172,8 +172,18 @@ export default function AgentConfigurator({ patient, onBack, onSave }) {
         </section>
 
         <button
-          onClick={onSave}
-          className="flex items-center gap-1.5 text-[13px] font-medium text-white bg-sage-500 hover:bg-sage-600 rounded-lg px-5 py-2.5 transition-colors"
+          onClick={() => {
+            const tmplObj = agentTemplates.find(t => t.id === config.template)
+            onSave({
+              templateId: config.template,
+              label: tmplObj?.label || config.template,
+              tone: config.tone,
+              styles: config.styles,
+              boundaries: config.boundaries,
+            })
+          }}
+          disabled={!config.template}
+          className="flex items-center gap-1.5 text-[13px] font-medium text-white bg-sage-500 hover:bg-sage-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-5 py-2.5 transition-colors"
         >
           <Save size={14} />
           Save configuration

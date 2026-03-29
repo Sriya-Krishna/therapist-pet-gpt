@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
-import { appointments } from '../data/mock'
+import { appointments as fallbackAppointments } from '../data/mock'
+import * as api from '../api'
 
 const TODAY = '2026-03-29'
 
@@ -30,10 +31,21 @@ function formatDateLabel(dateStr) {
   return `${weekday}, ${month} ${d}, ${y}`
 }
 
-export default function TherapistHome({ masterPrompt, onSaveMasterPrompt }) {
+export default function TherapistHome({ masterPrompt, onSaveMasterPrompt, backendAvailable }) {
   const [draft, setDraft] = useState(masterPrompt)
   const [saved, setSaved] = useState(false)
+  const [appointments, setAppointments] = useState(fallbackAppointments)
   const dirty = draft !== masterPrompt
+
+  useEffect(() => {
+    if (backendAvailable) {
+      api.getAppointments().then(setAppointments).catch(() => {})
+    }
+  }, [backendAvailable])
+
+  useEffect(() => {
+    setDraft(masterPrompt)
+  }, [masterPrompt])
 
   const saveMasterPrompt = () => {
     onSaveMasterPrompt(draft)

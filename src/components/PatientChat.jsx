@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, CalendarDays, ArrowLeft, Check } from 'lucide-react'
+import { Send, CalendarDays, ArrowLeft, Check, Loader2 } from 'lucide-react'
+import * as api from '../api'
 
-const agentReplies = [
+const agentFallbackReplies = [
   'Thank you for sharing that. What part of it feels most present right now?',
   'I\u2019m here with you. Take all the time you need.',
   'That\u2019s a really honest thing to say. What would feel supportive right now?',
@@ -45,13 +46,14 @@ function buildMonthAvailability() {
 
 const cal = buildMonthAvailability()
 
-export default function PatientChat({ patientModeUser, onRegister }) {
+export default function PatientChat({ patientModeUser, backendAvailable, onRegister }) {
   const [regName, setRegName] = useState('')
   const [regIntro, setRegIntro] = useState('')
   const [messages, setMessages] = useState([
     { from: 'agent', text: 'Welcome back. How are you feeling today?' },
   ])
   const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
   const [showScheduler, setShowScheduler] = useState(false)
   const [selectedDay, setSelectedDay] = useState(null)
   const [bookedSlot, setBookedSlot] = useState(null)
@@ -61,11 +63,26 @@ export default function PatientChat({ patientModeUser, onRegister }) {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const send = () => {
-    if (!input.trim()) return
-    const reply = agentReplies[Math.floor(Math.random() * agentReplies.length)]
-    setMessages(prev => [...prev, { from: 'patient', text: input }, { from: 'agent', text: reply }])
+  const send = async () => {
+    if (!input.trim() || sending) return
+    const text = input
     setInput('')
+    setMessages(prev => [...prev, { from: 'patient', text }])
+
+    if (backendAvailable && patientModeUser) {
+      setSending(true)
+      try {
+        const data = await api.chat(patientModeUser, text)
+        setMessages(prev => [...prev, { from: 'agent', text: data.response }])
+      } catch {
+        setMessages(prev => [...prev, { from: 'agent', text: 'Sorry, something went wrong. Please try again.' }])
+      } finally {
+        setSending(false)
+      }
+    } else {
+      const reply = agentFallbackReplies[Math.floor(Math.random() * agentFallbackReplies.length)]
+      setMessages(prev => [...prev, { from: 'agent', text: reply }])
+    }
   }
 
   const bookSlot = (date, slot) => {
@@ -298,9 +315,10 @@ export default function PatientChat({ patientModeUser, onRegister }) {
           />
           <button
             onClick={send}
-            className="absolute right-3 bottom-3 text-sage-500 hover:text-sage-700 transition-colors"
+            disabled={sending}
+            className="absolute right-3 bottom-3 text-sage-500 hover:text-sage-700 disabled:opacity-40 transition-colors"
           >
-            <Send size={18} />
+            {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
           </button>
         </div>
       </div>
