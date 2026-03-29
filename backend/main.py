@@ -34,7 +34,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from db import init_db, get_db, Patient, Message, Signal, Appointment, Setting
+from db import init_db, get_db, Patient, Message, Signal, BoundaryAudit, Appointment, Setting
 from llm import llm
 from prompts import assemble_system_prompt
 
@@ -189,6 +189,94 @@ def extract_signals(patient_message: str, agent_response: str, patient_name: str
         log.warning("Signal extraction failed for %s: %s", patient_id, e)
 
 
+# ── Boundary enforcement (verifier LLM) ───────────────────────
+
+BOUNDARY_VERIFY_PROMPT = """\
+You are a clinical safety auditor for a therapist-controlled AI system.
+The therapist has defined strict boundaries that the AI agent must NEVER violate.
+
+You will be given:
+1. The agent's response to a patient
+2. A list of boundaries
+
+For EACH boundary, determine whether the response violates it.
+
+Return ONLY a JSON array with one object per boundary:
+{"boundary": "the boundary text", "verdict": "pass" or "violation", "explanation": "brief reason"}
+
+Be strict — if there is any hint of a violation, flag it. False positives are safer than false negatives.
+A "pass" means the response clearly respects the boundary.
+A "violation" means the response contradicts, ignores, or undermines the boundary.
+
+Return ONLY the JSON array, no other text."""
+
+MAX_REGENERATION_ATTEMPTS = 2
+
+SAFE_FALLBACK = (
+    "I want to make sure I'm supporting you the right way. "
+    "Let me take a moment — could you tell me more about what's on your mind?"
+)
+
+
+def verify_boundaries(response_text: str, boundaries: list[str], patient_name: str,
+                      patient_id: str, db, time_str: str, date_str: str) -> list[dict]:
+    """Check agent response against therapist-defined boundaries.
+
+    Returns list of violation dicts (empty = all clear). Logs every check.
+    Fails open — if verification itself fails, response is allowed through.
+    """
+    if not boundaries:
+        return []
+
+    try:
+        boundary_list = "\n".join(f"- {b}" for b in boundaries)
+        messages = [{"role": "user", "content": (
+            f"Agent response: \"{response_text}\"\n\n"
+            f"Boundaries:\n{boundary_list}\n\n"
+            "Check each boundary. Return a JSON array."
+        )}]
+        raw = llm.generate(BOUNDARY_VERIFY_PROMPT, messages)
+
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+        results = json.loads(cleaned)
+        if not isinstance(results, list):
+            log.warning("Boundary verifier returned non-list for %s", patient_id)
+            return []
+
+        violations = []
+        for r in results:
+            if not isinstance(r, dict):
+                continue
+            verdict = r.get("verdict", "pass").lower()
+            audit = BoundaryAudit(
+                patient_id=patient_id,
+                patient_name=patient_name,
+                boundary=r.get("boundary", ""),
+                agent_response=response_text,
+                verdict=verdict,
+                explanation=r.get("explanation", ""),
+                action_taken="none",
+                time=time_str,
+                date=date_str,
+            )
+            db.add(audit)
+            if verdict == "violation":
+                violations.append(r)
+
+        commit(db)
+        return violations
+
+    except json.JSONDecodeError as e:
+        log.warning("Boundary verification JSON parse failed for %s: %s", patient_id, e)
+        return []
+    except Exception as e:
+        log.warning("Boundary verification failed for %s: %s", patient_id, e)
+        return []
+
+
 # ── Patients ───────────────────────────────────────────────────
 
 @app.get("/api/patients")
@@ -298,6 +386,56 @@ def chat(patient_id: str, body: ChatMessage, db: Session = Depends(get_db)):
     time_str = now.strftime("%-I:%M %p")
     date_str = "Today"
 
+    # ── Boundary enforcement (verifier LLM) ──
+    boundaries = agent.get("boundaries", [])
+    boundary_enforced = False
+
+    if boundaries:
+        violations = verify_boundaries(
+            response_text, boundaries, patient.name, patient_id, db, time_str, date_str,
+        )
+
+        # If violations found, regenerate with explicit violation context
+        for attempt in range(MAX_REGENERATION_ATTEMPTS):
+            if not violations:
+                break
+
+            violated_rules = "\n".join(f"- {v.get('boundary', '')}: {v.get('explanation', '')}" for v in violations)
+            log.info("Boundary violation detected for %s (attempt %d), regenerating", patient_id, attempt + 1)
+
+            patched_prompt = (
+                system_prompt + "\n\n---\n\n"
+                "## CRITICAL: Your previous response violated these boundaries:\n"
+                f"{violated_rules}\n\n"
+                "Generate a new response that strictly respects ALL boundaries."
+            )
+
+            try:
+                response_text = llm.generate(patched_prompt, conversation)
+            except Exception:
+                break
+
+            violations = verify_boundaries(
+                response_text, boundaries, patient.name, patient_id, db, time_str, date_str,
+            )
+
+        # If still violating after retries, use safe fallback
+        if violations:
+            log.warning("Boundary violations persist for %s after %d retries — using safe fallback",
+                        patient_id, MAX_REGENERATION_ATTEMPTS)
+            response_text = SAFE_FALLBACK
+            boundary_enforced = True
+
+            # Log the fallback in audit
+            for v in violations:
+                db.add(BoundaryAudit(
+                    patient_id=patient_id, patient_name=patient.name,
+                    boundary=v.get("boundary", ""), agent_response=response_text,
+                    verdict="violation", explanation=v.get("explanation", ""),
+                    action_taken="fallback", time=time_str, date=date_str,
+                ))
+            commit(db)
+
     # Persist both messages
     db.add(Message(patient_id=patient_id, from_role="patient", text=body.text, time=time_str, date=date_str))
     db.add(Message(patient_id=patient_id, from_role="agent", text=response_text, time=time_str, date=date_str))
@@ -317,6 +455,7 @@ def chat(patient_id: str, body: ChatMessage, db: Session = Depends(get_db)):
 
     return {
         "response": response_text,
+        "boundaryEnforced": boundary_enforced,
     }
 
 
@@ -333,6 +472,14 @@ def acknowledge_signal(signal_id: int, db: Session = Depends(get_db)):
     s.acknowledged = True
     commit(db)
     return s.to_dict()
+
+
+# ── Boundary Audit Log ─────────────────────────────────────────
+
+@app.get("/api/audit-log")
+def list_audit_log(db: Session = Depends(get_db)):
+    audits = db.query(BoundaryAudit).order_by(BoundaryAudit.id.desc()).limit(100).all()
+    return [a.to_dict() for a in audits]
 
 
 # ── Appointments ───────────────────────────────────────────────

@@ -112,6 +112,35 @@ class Signal(Base):
         }
 
 
+class BoundaryAudit(Base):
+    """Log of boundary enforcement checks on agent responses."""
+    __tablename__ = "boundary_audits"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id = Column(String, ForeignKey("patients.id"), nullable=False)
+    patient_name = Column(String, nullable=False)
+    boundary = Column(Text, nullable=False)
+    agent_response = Column(Text, nullable=False)
+    verdict = Column(String, nullable=False)  # 'pass' or 'violation'
+    explanation = Column(Text, default="")
+    action_taken = Column(String, nullable=False)  # 'none', 'regenerated', 'fallback'
+    time = Column(String, nullable=False)
+    date = Column(String, nullable=False)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "patientId": self.patient_id,
+            "patientName": self.patient_name,
+            "boundary": self.boundary,
+            "agentResponse": self.agent_response[:120] + ("..." if len(self.agent_response) > 120 else ""),
+            "verdict": self.verdict,
+            "explanation": self.explanation,
+            "actionTaken": self.action_taken,
+            "time": self.time,
+            "date": self.date,
+        }
+
+
 class Appointment(Base):
     __tablename__ = "appointments"
     id = Column(Integer, primary_key=True, autoincrement=True)

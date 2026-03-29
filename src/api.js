@@ -71,6 +71,12 @@ export function acknowledgeSignal(id) {
   return request(`/signals/${id}/acknowledge`, { method: 'PUT' })
 }
 
+// ── Audit Log ────────────────────────────────────────────────
+
+export function getAuditLog() {
+  return request('/audit-log')
+}
+
 // ── Appointments ──────────────────────────────────────────────
 
 export function getAppointments(date) {

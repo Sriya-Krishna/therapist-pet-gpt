@@ -220,6 +220,17 @@ export default function PatientChat({ patientModeUser, backendAvailable, onRegis
   const [bookedSlot, setBookedSlot] = useState(null)
   const endRef = useRef(null)
 
+  // Load conversation history when patient is identified
+  useEffect(() => {
+    if (!patientModeUser || !backendAvailable) return
+    api.getPatients().then(patients => {
+      const p = patients.find(pt => pt.id === patientModeUser)
+      if (p && p.messages.length > 0) {
+        setMessages(p.messages.map(m => ({ from: m.from, text: m.text })))
+      }
+    }).catch(() => {})
+  }, [patientModeUser, backendAvailable])
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])

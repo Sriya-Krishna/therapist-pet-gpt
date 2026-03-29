@@ -13,6 +13,9 @@ Instead of having unsafe convos with chatgpt this can be a safer alternative.
 
 An AI-assisted mental wellness platform where therapists configure per-patient AI sub-agents. The AI mediates patient conversations under the therapist's full control — it never diagnoses, prescribes, or provides clinical advice.
 
+
+check out the live app here on vercel: https://therapist-pet-gpt.vercel.app/
+
 ## What's Built
 
 **Therapist dashboard**
@@ -47,10 +50,8 @@ An AI-assisted mental wellness platform where therapists configure per-patient A
 
 ## Not Yet Implemented
 
-- AI-generated patient summaries (currently static seed data)
 - Real appointment booking (scheduler is a client-side mockup)
 - Authentication / user accounts
-- Conversation history cap (all messages are sent to the LLM — no truncation yet)
 
 ## Getting Started
 

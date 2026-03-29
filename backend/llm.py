@@ -130,6 +130,10 @@ class MockLLM(LLMProvider):
         if "signal extraction system" in system_prompt.lower():
             return self._mock_signal_extraction(messages)
 
+        # Boundary verification calls
+        if "clinical safety auditor" in system_prompt.lower():
+            return self._mock_boundary_check(messages)
+
         template_id = "_default"
         for tid in ("anchor", "structured", "reflective", "perspective", "soft"):
             if f"Therapeutic approach: {tid.capitalize()}" in system_prompt or \
@@ -139,6 +143,18 @@ class MockLLM(LLMProvider):
 
         pool = self.RESPONSES.get(template_id, self.RESPONSES["_default"])
         return random.choice(pool)
+
+    def _mock_boundary_check(self, messages: list[dict]) -> str:
+        """Parse boundaries from the message and return all-pass verdicts."""
+        content = messages[0]["content"] if messages else ""
+        results = []
+        for line in content.split("\n"):
+            line = line.strip()
+            if line.startswith("- ") and line != "- ":
+                boundary = line[2:]
+                results.append({"boundary": boundary, "verdict": "pass",
+                                "explanation": "Response does not violate this boundary."})
+        return json.dumps(results) if results else "[]"
 
     def _mock_signal_extraction(self, messages: list[dict]) -> str:
         """Return mock signals occasionally so the pipeline is testable."""

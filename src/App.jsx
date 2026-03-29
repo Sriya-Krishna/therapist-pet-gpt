@@ -18,6 +18,7 @@ import SignalsFeed from './components/SignalsFeed'
 import PatientChat from './components/PatientChat'
 import TherapistHome from './components/TherapistHome'
 import AddPatientModal from './components/AddPatientModal'
+import AuditLog from './components/AuditLog'
 import { patients as fallbackPatients, signals as fallbackSignals, defaultMasterPrompt } from './data/mock'
 import * as api from './api'
 
@@ -179,6 +180,9 @@ export default function App() {
           )}
           {view === 'signals' && (
             <SignalsFeed signals={signals} onAcknowledge={acknowledge} />
+          )}
+          {view === 'audit' && (
+            <AuditLog backendAvailable={backendAvailable} />
           )}
         </div>
       )}

@@ -8,12 +8,13 @@
  * The signals badge shows the count of unacknowledged signals.
  */
 
-import { Users, Bot, Activity, UserCircle, ArrowLeft, Palette } from 'lucide-react'
+import { Users, Bot, Activity, ShieldCheck, UserCircle, ArrowLeft, Palette } from 'lucide-react'
 
 const navItems = [
   { id: 'patients', label: 'Patients', icon: Users },
   { id: 'agents', label: 'Agents', icon: Bot },
   { id: 'signals', label: 'Signals', icon: Activity },
+  { id: 'audit', label: 'Audit', icon: ShieldCheck },
 ]
 
 export default function TopBar({ view, onNavigate, onGoHome, isPatientMode, onToggleMode, signalCount, patientTheme, onChangeTheme }) {
