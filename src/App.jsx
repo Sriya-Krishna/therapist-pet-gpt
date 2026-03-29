@@ -22,6 +22,7 @@ export default function App() {
   const [patientModeUser, setPatientModeUser] = useState(null)
   const [masterPrompt, setMasterPrompt] = useState(defaultMasterPrompt)
   const [backendAvailable, setBackendAvailable] = useState(false)
+  const [patientTheme, setPatientTheme] = useState('floral')
 
   // ── Load from backend on mount, fall back to mock data ──────
   useEffect(() => {
@@ -114,12 +115,15 @@ export default function App() {
         isPatientMode={isPatientMode}
         onToggleMode={() => setIsPatientMode(m => !m)}
         signalCount={unacknowledged}
+        patientTheme={patientTheme}
+        onChangeTheme={setPatientTheme}
       />
 
       {isPatientMode ? (
         <PatientChat
           patientModeUser={patientModeUser}
           backendAvailable={backendAvailable}
+          theme={patientTheme}
           onRegister={async (name, intro) => {
             const id = await addPatient(name, intro)
             setPatientModeUser(id)

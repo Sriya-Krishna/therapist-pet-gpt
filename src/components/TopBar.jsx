@@ -1,4 +1,4 @@
-import { Users, Bot, Activity, UserCircle, ArrowLeft } from 'lucide-react'
+import { Users, Bot, Activity, UserCircle, ArrowLeft, Palette } from 'lucide-react'
 
 const navItems = [
   { id: 'patients', label: 'Patients', icon: Users },
@@ -6,7 +6,7 @@ const navItems = [
   { id: 'signals', label: 'Signals', icon: Activity },
 ]
 
-export default function TopBar({ view, onNavigate, onGoHome, isPatientMode, onToggleMode, signalCount }) {
+export default function TopBar({ view, onNavigate, onGoHome, isPatientMode, onToggleMode, signalCount, patientTheme, onChangeTheme }) {
   return (
     <header className="h-14 bg-white border-b border-stone-200/70 flex items-center px-5 shrink-0">
       <button onClick={onGoHome} className="flex items-center gap-2.5 mr-8 hover:opacity-80 transition-opacity">
@@ -41,6 +41,21 @@ export default function TopBar({ view, onNavigate, onGoHome, isPatientMode, onTo
       )}
 
       <div className="flex-1" />
+
+      {isPatientMode && (
+        <div className="flex items-center gap-1.5 mr-3">
+          <Palette size={14} className="text-stone-400" />
+          <select
+            value={patientTheme}
+            onChange={e => onChangeTheme(e.target.value)}
+            className="text-[12px] rounded-md border border-stone-200 px-2 py-1 text-stone-600 bg-white focus:outline-none cursor-pointer"
+          >
+            <option value="floral">Floral</option>
+            <option value="starryNight">Starry Night</option>
+            <option value="enthusiastic">Enthusiastic</option>
+          </select>
+        </div>
+      )}
 
       <button
         onClick={onToggleMode}

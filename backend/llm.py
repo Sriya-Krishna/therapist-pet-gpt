@@ -9,6 +9,9 @@ OPENAI_API_BASE and OPENAI_API_KEY from the environment.
 import os
 import random
 from abc import ABC, abstractmethod
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class LLMProvider(ABC):
@@ -29,20 +32,18 @@ class LLMProvider(ABC):
 
 class OpenAILLM(LLMProvider):
     """
-    OpenAI-compatible provider. Works with OpenAI, Azure OpenAI, LMStudio,
-    Ollama, or any API that follows the OpenAI chat completions format.
+    OpenAI-compatible provider pointed at Anthropic's API.
 
     Env vars:
-        OPENAI_API_KEY   — API key (required)
-        OPENAI_API_BASE  — Base URL (default: https://api.openai.com/v1)
-        OPENAI_MODEL     — Model name (default: gpt-4o-mini)
+        ANTHROPIC_API_KEY — API key (required)
+        ANTHROPIC_MODEL   — Model name (default: claude-sonnet-4-20250514)
     """
 
     def __init__(self):
         import httpx
-        self.api_key = os.environ["OPENAI_API_KEY"]
-        self.base_url = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1").rstrip("/")
-        self.model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        self.api_key = os.environ["ANTHROPIC_API_KEY"]
+        self.base_url = "https://api.anthropic.com/v1"
+        self.model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
         self.client = httpx.Client(timeout=60)
 
     def generate(self, system_prompt: str, messages: list[dict]) -> str:
@@ -62,12 +63,7 @@ class OpenAILLM(LLMProvider):
         )
         resp.raise_for_status()
         data = resp.json()
-        print(f"[LLM] Response keys: {list(data.keys())}")
-        try:
-            return data["choices"][0]["message"]["content"]
-        except (KeyError, IndexError):
-            print(f"[LLM] Unexpected response body: {data}")
-            raise
+        return data["choices"][0]["message"]["content"]
 
 
 class MockLLM(LLMProvider):
@@ -137,7 +133,7 @@ class MockLLM(LLMProvider):
 # ── Active provider ────────────────────────────────────────────
 # Uses OpenAI-compatible API if OPENAI_API_KEY is set, otherwise MockLLM.
 
-if os.environ.get("OPENAI_API_KEY"):
+if os.environ.get("ANTHROPIC_API_KEY"):
     llm = OpenAILLM()
 else:
     llm = MockLLM()
