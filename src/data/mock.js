@@ -177,6 +177,24 @@ export const agentTemplates = [
   { id: 'soft', label: 'Soft presence', description: 'Minimal, warm, non-intrusive. Respects low-engagement needs.', defaults: { warmth: 8, directness: 2, verbosity: 2 }, styles: ['Mindfulness prompts'] },
 ]
 
+export const appointments = [
+  // Today — Sunday, March 29, 2026
+  { id: 1, patientId: 'elena',  patientName: 'Elena V.',  initials: 'EV', patientStatus: 'crisis',  type: 'Crisis Check-in', date: '2026-03-29', startTime: '10:00', endTime: '10:50', status: 'completed' },
+  { id: 2, patientId: 'rashid', patientName: 'Rashid O.', initials: 'RO', patientStatus: 'warning', type: 'Session',          date: '2026-03-29', startTime: '14:00', endTime: '14:50', status: 'upcoming'  },
+  { id: 3, patientId: 'sophie', patientName: 'Sophie C.', initials: 'SC', patientStatus: 'active',  type: 'Session',          date: '2026-03-29', startTime: '16:00', endTime: '16:50', status: 'upcoming'  },
+  // Monday, March 30
+  { id: 4, patientId: 'tomasz', patientName: 'Tomasz K.', initials: 'TK', patientStatus: 'active',  type: 'Session',          date: '2026-03-30', startTime: '09:00', endTime: '09:50', status: 'upcoming'  },
+  { id: 5, patientId: 'priya',  patientName: 'Priya N.',  initials: 'PN', patientStatus: 'quiet',   type: 'Check-in',         date: '2026-03-30', startTime: '11:00', endTime: '11:30', status: 'upcoming'  },
+  // Tuesday, March 31
+  { id: 6, patientId: 'marcus', patientName: 'Marcus W.', initials: 'MW', patientStatus: 'new',     type: 'Intake',           date: '2026-03-31', startTime: '10:00', endTime: '11:00', status: 'upcoming'  },
+  { id: 7, patientId: 'elena',  patientName: 'Elena V.',  initials: 'EV', patientStatus: 'crisis',  type: 'Session',          date: '2026-03-31', startTime: '14:00', endTime: '14:50', status: 'upcoming'  },
+  // Wednesday, April 1
+  { id: 8, patientId: 'rashid', patientName: 'Rashid O.', initials: 'RO', patientStatus: 'warning', type: 'Session',          date: '2026-04-01', startTime: '10:00', endTime: '10:50', status: 'upcoming'  },
+  { id: 9, patientId: 'sophie', patientName: 'Sophie C.', initials: 'SC', patientStatus: 'active',  type: 'Follow-up',        date: '2026-04-01', startTime: '15:00', endTime: '15:50', status: 'upcoming'  },
+  // Thursday, April 2
+  { id: 10, patientId: 'tomasz', patientName: 'Tomasz K.', initials: 'TK', patientStatus: 'active', type: 'Session',          date: '2026-04-02', startTime: '09:00', endTime: '09:50', status: 'upcoming'  },
+]
+
 export const responseStyles = [
   'Grounding techniques',
   'Cognitive reframing',
