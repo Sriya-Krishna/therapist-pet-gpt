@@ -51,42 +51,58 @@ In development, Vite proxies `/api` requests to `localhost:8000`. CORS is config
 
 ## Architecture
 
-### Frontend: Top Bar + Three Panels
+### Frontend: Top Bar + Four Panels
 
-The app uses a horizontal top navigation bar (`TopBar`) with three content views, plus a persona toggle to swap into patient mode. The logo acts as a home button (deselects patient, navigates to patients view).
+The app uses a horizontal top navigation bar (`TopBar`) with four content views, plus a persona toggle to swap into patient mode. The logo acts as a home button (deselects patient, navigates to patients view).
 
 ```
-TopBar:  [Logo=Home]  [Patients] [Agents] [Signals]  [Theme dropdown]  [Patient view]
+TopBar:  [Logo=Home]  [Patients] [Agents] [Signals] [Audit]  [Theme ▾]  [Patient view]
 Content: [PatientList | TherapistHome]                — default (no patient selected)
          [PatientList | Workspace | ContextPanel]     — patient selected
          [AgentsGrid]                                 — Agents view
          [SignalsFeed]                                — Signals view
+         [AuditLog]                                   — Boundary audit trail
          [PatientChat]                                — Patient mode
          [AgentConfigurator]                          — overlay when configuring
          [AddPatientModal]                            — overlay when adding patient
 ```
 
-Frontend state lives in `App.jsx` and flows down via props. On mount it fetches from the backend API (`src/api.js`); if the backend is unreachable it falls back to `src/data/mock.js`.
+Frontend state lives in `App.jsx` and flows down via props. On mount it fetches from the backend API (`src/api.js`); if the backend is unreachable it falls back to `src/data/mock.js`. Status color constants are shared via `src/constants/statusColors.js`.
 
 ### Patient-Side Themes
 
-`PatientChat.jsx` supports four visual themes selectable from the TopBar when in patient mode: Default, Floral, Starry Night, Enthusiastic. Each theme defines a full color palette (accent, heading, body, border, etc.) applied via inline styles and CSS custom properties. Decorative background elements (blurred shapes, star field, nebula clouds, warm glows) are rendered as positioned DOM elements and CSS pseudo-elements in `index.css`. The theme class (`theme-floral`, `theme-starryNight`, `theme-enthusiastic`) on the container activates the CSS decorations.
+`PatientChat.jsx` supports four visual themes selectable from the TopBar when in patient mode: Default, Floral, Starry Night, Enthusiastic. Each theme defines a full color palette applied via inline styles and CSS custom properties. Decorative background elements are rendered as positioned DOM elements and CSS pseudo-elements in `index.css`. Theme selection is not persisted to the backend.
 
-### Backend: REST API + Prompt Pipeline
+### Backend: REST API + Post-Chat Pipeline
 
 `backend/main.py` is the FastAPI app. All endpoints under `/api/`. Key routes:
 - `GET/POST /api/patients` — list / create
 - `PUT /api/patients/{id}/agent` — update agent config
 - `GET/PUT /api/master-prompt` — global master prompt
-- `POST /api/chat/{patient_id}` — the core chat pipeline (assembles prompt, calls LLM, persists messages)
+- `POST /api/chat/{patient_id}` — the core pipeline (see below)
 - `GET /api/signals`, `PUT /api/signals/{id}/acknowledge`
+- `GET /api/audit-log` — boundary enforcement audit trail
 - `GET /api/appointments?date=YYYY-MM-DD`
 
-Database models in `backend/db.py`: `Patient`, `Message`, `Signal`, `Appointment`, `Setting`. Patient agent config is stored as a JSON string column (`agent_config`) with `get_agent()`/`set_agent()` helpers.
+Database models in `backend/db.py`: `Patient`, `Message`, `Signal`, `BoundaryAudit`, `Appointment`, `Setting`. Patient agent config is stored as a JSON string column (`agent_config`) with `get_agent()`/`set_agent()` helpers. Each model has a `to_dict()` method for serialization.
+
+### Post-Chat Pipeline (`POST /api/chat/{patient_id}`)
+
+This is the core pipeline. After every patient message, the following chain runs:
+
+1. **Prompt assembly** — 7-layer system prompt (see below)
+2. **Response generation** — LLM call with full conversation history
+3. **Boundary enforcement** — verifier LLM checks response against every therapist-defined boundary. If violation detected: regenerate with violation context (up to 2 retries), then fall back to safe response
+4. **Persist messages** — both patient message and agent response saved to DB
+5. **Signal extraction** — secondary LLM call analyzes the exchange for clinical signals (critical/warning/positive/info), creates Signal records
+6. **Status auto-update** — patient status recalculated from unacknowledged signals (critical→crisis, warning→warning, active conversation→active, else quiet)
+7. **Summary regeneration** — summarization LLM call regenerates patient summary and recommendation from last 20 messages
+
+Steps 3-7 each fail independently — a failed signal extraction or summary generation never breaks the chat response.
 
 ### Prompt Assembly Pipeline (`backend/prompts/`)
 
-This is the core non-obvious architecture. The system prompt is built in layers (order matters):
+The system prompt is built in layers (order matters):
 
 1. **Master prompt** (`Setting` table) — therapist's base instructions, inviolable
 2. **Bridge text** — explicit instruction that foundation overrides everything below
@@ -96,20 +112,44 @@ This is the core non-obvious architecture. The system prompt is built in layers 
 6. **Boundaries** — hard constraints that override everything above
 7. **Patient context** — summary + recent signals (last so LLM has it freshest)
 
-Sections are joined with `---` separators. Boundaries come late intentionally so they act as final authority. `prompts/demo.py` prints assembled prompts for two contrasting agents to verify the pipeline.
+Sections are joined with `---` separators. Boundaries come late intentionally so they act as final authority.
+
+### Boundary Enforcement
+
+The verifier LLM (`BOUNDARY_VERIFY_PROMPT` in main.py) checks every agent response against therapist-defined boundaries before it reaches the patient. Returns a JSON array with one pass/violation verdict per boundary. On violation:
+- Regenerate with violation context injected into the prompt (up to `MAX_REGENERATION_ATTEMPTS = 2`)
+- If still violating, substitute `SAFE_FALLBACK` response
+- Every check is logged to the `BoundaryAudit` table with verdict, explanation, and action taken (`none`, `regenerated`, or `fallback`)
+
+The Audit tab in the frontend (`AuditLog.jsx`) displays all checks with stats (total/passed/violations).
+
+### Signal Extraction
+
+The signal extraction LLM (`SIGNAL_EXTRACTION_PROMPT` in main.py) analyzes each patient-agent exchange and returns a JSON array of signals. Four clinical categories:
+- **critical** — imminent risk (self-harm, crisis escalation)
+- **warning** — behavioral pattern shifts (sleep, substance nostalgia, avoidance)
+- **positive** — therapeutic milestones (self-identified patterns, coping use)
+- **info** — neutral observations (milestones, engagement changes)
+
+JSON parsing handles markdown code fences. Malformed responses are logged and silently dropped.
 
 ### LLM Integration
 
-`backend/llm.py` reads `ANTHROPIC_API_KEY` and optionally `ANTHROPIC_MODEL` (default: `claude-sonnet-4-20250514`) from `backend/.env` via python-dotenv. It calls Anthropic's OpenAI-compatible endpoint (`https://api.anthropic.com/v1/chat/completions`). The chat endpoint sends the full conversation history per patient to the LLM on every request.
+`backend/llm.py` reads `ANTHROPIC_API_KEY` and optionally `ANTHROPIC_MODEL` (default: `claude-sonnet-4-20250514`) from `backend/.env`. The chat endpoint uses the LLM for four distinct purposes:
+1. Response generation (main conversation)
+2. Boundary verification (safety auditor prompt)
+3. Signal extraction (clinical signal prompt)
+4. Summary generation (summarization prompt)
 
-The `MockLLM` detects which template is active by scanning the system prompt text, then returns a random response from a matching pool. This lets you test the full pipeline without API credits.
+`MockLLM` detects which call type it's handling by scanning the system prompt and returns appropriate mock data for each. This lets you test the full pipeline without API credits.
 
 ### Data Model
 
 - 6 seed patients with 5 status levels: `crisis`, `warning`, `active`, `quiet`, `new`
 - 5 agent templates with distinct therapeutic approaches
-- Signals replace alerts — include positive milestones, not just problems. "Acknowledge" instead of "Resolve."
-- `seed.py` mirrors `src/data/mock.js` data into SQLite. Skip if already seeded.
+- Signals include positive milestones, not just problems. "Acknowledge" instead of "Resolve"
+- `BoundaryAudit` logs every boundary check with verdict and action taken
+- `seed.py` mirrors `src/data/mock.js` data into SQLite. Skip if already seeded
 
 ### Design System
 
@@ -122,10 +162,13 @@ The `MockLLM` detects which template is active by scanning the system prompt tex
 
 ### Crisis Detection
 
-Handled via the LLM prompt at inference time, not client-side. The frontend does not perform keyword matching.
+Handled via the LLM at inference time through two mechanisms:
+1. The system prompt includes boundaries that instruct the agent to escalate crisis signals
+2. The signal extraction pipeline post-chat detects crisis markers and creates `critical` signals that auto-update patient status to `crisis`
 
 ## Key Design Decisions
 
 - The frontend and backend hold duplicate seed data (mock.js vs SQLite). The frontend fetches from the API when available but falls back to mock.js if the backend is down.
-- The chat endpoint returns `systemPrompt` in its response for debugging — this should be removed in production.
-- Patient themes are purely client-side (CSS/inline styles). Theme selection is not persisted to the backend.
+- Patient themes are purely client-side (CSS/inline styles). Theme selection is not persisted.
+- The post-chat pipeline (boundary enforcement, signals, summaries, status) runs synchronously but each step is wrapped in independent error handling. A production deployment would make these async/background tasks.
+- `MockLLM` supports all four LLM call types (chat, boundary check, signal extraction, summary) by detecting the system prompt content.
