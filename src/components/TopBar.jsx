@@ -1,3 +1,13 @@
+/**
+ * Horizontal navigation bar at the top of every view.
+ *
+ * Therapist mode: logo (home) + [Patients | Agents | Signals] nav + Patient view toggle.
+ * Patient mode:   logo + theme dropdown (Palette icon) + Therapist view toggle.
+ *
+ * The logo click deselects the current patient and navigates to the patients list.
+ * The signals badge shows the count of unacknowledged signals.
+ */
+
 import { Users, Bot, Activity, UserCircle, ArrowLeft, Palette } from 'lucide-react'
 
 const navItems = [
@@ -50,6 +60,7 @@ export default function TopBar({ view, onNavigate, onGoHome, isPatientMode, onTo
             onChange={e => onChangeTheme(e.target.value)}
             className="text-[12px] rounded-md border border-stone-200 px-2 py-1 text-stone-600 bg-white focus:outline-none cursor-pointer"
           >
+            <option value="default">Default</option>
             <option value="floral">Floral</option>
             <option value="starryNight">Starry Night</option>
             <option value="enthusiastic">Enthusiastic</option>

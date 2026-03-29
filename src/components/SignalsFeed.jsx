@@ -1,3 +1,12 @@
+/**
+ * Chronological feed of AI-generated signals across all patients.
+ *
+ * Grouped by date. Each signal shows a type-colored dot (critical=red,
+ * warning=amber, positive=emerald, info=sky), patient name, timestamp,
+ * summary text, and detail. Unacknowledged signals have a card border
+ * and an "Ack" button; acknowledged ones are dimmed.
+ */
+
 import { Check } from 'lucide-react'
 
 const dotColor = {

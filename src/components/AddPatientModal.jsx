@@ -1,3 +1,13 @@
+/**
+ * Modal dialog for adding a new patient.
+ *
+ * Fields: full name (required) and initial note (optional).
+ * Shows a live preview of the derived initials as the name is typed.
+ * On submit, calls the parent's onSubmit(name, note) callback which
+ * creates the patient via the backend API and selects them.
+ * Click-outside or Cancel dismisses without action.
+ */
+
 import { useState } from 'react'
 import { X, UserPlus } from 'lucide-react'
 

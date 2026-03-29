@@ -1,3 +1,16 @@
+/**
+ * Default view when no patient is selected — calendar + master prompt editor.
+ *
+ * Left column: interactive monthly calendar with appointment dots.
+ *   Clicking a day shows that day's schedule. Stats row at the bottom.
+ *
+ * Right column:
+ *   - Day schedule: list of appointments sorted by start time, with
+ *     patient avatars, status badges, and completion state.
+ *   - Master prompt editor: textarea with save button. The master prompt
+ *     is inherited by every patient agent (see backend/prompts/assemble.py).
+ */
+
 import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { appointments as fallbackAppointments } from '../data/mock'

@@ -1,3 +1,13 @@
+/**
+ * Root component — owns all top-level state and renders the current view.
+ *
+ * On mount, fetches patients/signals/masterPrompt from the backend API.
+ * Falls back to src/data/mock.js if the backend is unreachable.
+ *
+ * State flows downward via props; callbacks bubble actions back up.
+ * Views: patients (default) | agents | signals | patient mode (PatientChat).
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import TopBar from './components/TopBar'
 import PatientList from './components/PatientList'
@@ -22,7 +32,7 @@ export default function App() {
   const [patientModeUser, setPatientModeUser] = useState(null)
   const [masterPrompt, setMasterPrompt] = useState(defaultMasterPrompt)
   const [backendAvailable, setBackendAvailable] = useState(false)
-  const [patientTheme, setPatientTheme] = useState('floral')
+  const [patientTheme, setPatientTheme] = useState('default')
 
   // ── Load from backend on mount, fall back to mock data ──────
   useEffect(() => {

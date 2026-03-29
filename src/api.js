@@ -1,3 +1,10 @@
+/**
+ * REST client for the MindBridge backend.
+ *
+ * All functions return a Promise that resolves to parsed JSON.
+ * In development, Vite proxies /api to http://localhost:8000 (see vite.config.js).
+ */
+
 const BASE = '/api'
 
 async function request(path, options = {}) {

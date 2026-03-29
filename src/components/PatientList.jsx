@@ -1,3 +1,12 @@
+/**
+ * Sidebar listing all patients with status indicators.
+ *
+ * Each row shows name, status badge, assigned agent label, and last-active time.
+ * A colored left border indicates patient status (crisis=red, warning=amber, etc.).
+ * The selected patient is highlighted with a sage accent. The "+" button opens
+ * the AddPatientModal.
+ */
+
 import { Plus } from 'lucide-react'
 
 const statusColors = {

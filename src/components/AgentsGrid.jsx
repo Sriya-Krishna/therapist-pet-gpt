@@ -1,3 +1,11 @@
+/**
+ * Grid view of all patient agent configurations.
+ *
+ * Configured patients show as cards with template label, tone sliders (W/D/V),
+ * styles, and boundary count. Unconfigured patients appear as dashed "+"
+ * placeholders. Clicking any card opens the AgentConfigurator inline.
+ */
+
 import { Plus } from 'lucide-react'
 import AgentConfigurator from './AgentConfigurator'
 

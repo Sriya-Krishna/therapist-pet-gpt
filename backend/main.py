@@ -1,6 +1,17 @@
 """
-MindBridge API server.
+MindBridge API server (FastAPI).
 
+Endpoints:
+    GET/POST  /api/patients              — list or create patients
+    GET       /api/patients/{id}         — single patient with messages
+    PUT       /api/patients/{id}/agent   — update agent config (template, tone, etc.)
+    GET/PUT   /api/master-prompt         — therapist's global base instructions
+    POST      /api/chat/{patient_id}     — core pipeline: assemble prompt → call LLM → persist
+    GET       /api/signals               — all signals (sorted newest-first)
+    PUT       /api/signals/{id}/acknowledge
+    GET       /api/appointments          — optionally filtered by ?date=YYYY-MM-DD
+
+Run:
     cd backend
     pip install -r requirements.txt
     python seed.py          # first run only

@@ -1,3 +1,21 @@
+/**
+ * Patient-facing chat interface with visual themes.
+ *
+ * Three sub-views: registration form → chat → scheduler.
+ * Supports four themes (default, floral, starryNight, enthusiastic) selected
+ * via the TopBar dropdown. Themes define a full color palette applied through
+ * inline styles and CSS custom properties (--theme-accent, --theme-focus,
+ * --theme-placeholder). Decorative background elements (blurred shapes, star
+ * field) are rendered by the ThemeDecor component and styled via CSS classes
+ * in index.css (e.g. .theme-starryNight::before).
+ *
+ * Props:
+ *   patientModeUser  — patient ID after registration (null = show registration)
+ *   backendAvailable — whether to call the real chat API or use fallback replies
+ *   onRegister       — callback(name, intro) to create a patient
+ *   theme            — one of: 'default' | 'floral' | 'starryNight' | 'enthusiastic'
+ */
+
 import { useState, useRef, useEffect } from 'react'
 import { Send, CalendarDays, ArrowLeft, Check, Loader2 } from 'lucide-react'
 import * as api from '../api'
@@ -48,10 +66,33 @@ const cal = buildMonthAvailability()
 
 /* ── Theme definitions ──────────────────────────────────────────── */
 const THEMES = {
+  default: {
+    label: 'Default',
+    bg: '#FEFDFB',
+    card: '#ffffff',
+    accent: '#4A7C6F',
+    accentHover: '#3d6a5e',
+    accentSoft: '#f2f7f5',
+    accentMuted: '#6b9e91',
+    heading: '#57534e',
+    body: '#78716c',
+    muted: '#a8a29e',
+    border: '#e7e5e4',
+    focusRing: '#c7ddd5',
+    breathe: '#c7ddd5',
+    input: '#44403c',
+    placeholder: '#d6d3d1',
+  },
   floral: {
     label: 'Floral',
-    bg: 'linear-gradient(160deg, #fdf2f8 0%, #fce7f3 40%, #fff1f2 70%, #fefdfb 100%)',
-    card: '#ffffff',
+    bg: [
+      'radial-gradient(circle at 80% 10%, rgba(249,168,212,0.25) 0%, transparent 40%)',
+      'radial-gradient(circle at 15% 85%, rgba(251,207,232,0.3) 0%, transparent 45%)',
+      'radial-gradient(circle at 55% 45%, rgba(253,242,248,0.4) 0%, transparent 55%)',
+      'radial-gradient(circle at 35% 15%, rgba(244,114,182,0.1) 0%, transparent 35%)',
+      'linear-gradient(160deg, #fdf2f8 0%, #fce7f3 30%, #fff1f2 60%, #fefdfb 100%)',
+    ].join(', '),
+    card: 'rgba(255,255,255,0.85)',
     accent: '#ec4899',
     accentHover: '#db2777',
     accentSoft: '#fce7f3',
@@ -67,8 +108,14 @@ const THEMES = {
   },
   starryNight: {
     label: 'Starry Night',
-    bg: 'linear-gradient(160deg, #0f172a 0%, #1e1b4b 50%, #172554 100%)',
-    card: 'rgba(30,27,75,0.5)',
+    bg: [
+      'radial-gradient(ellipse at 70% 20%, rgba(88,28,135,0.35) 0%, transparent 50%)',
+      'radial-gradient(ellipse at 25% 75%, rgba(30,58,138,0.4) 0%, transparent 50%)',
+      'radial-gradient(ellipse at 90% 80%, rgba(67,56,202,0.2) 0%, transparent 40%)',
+      'radial-gradient(circle at 50% 50%, rgba(15,23,42,0.3) 0%, transparent 70%)',
+      'linear-gradient(160deg, #0f172a 0%, #1e1b4b 45%, #172554 80%, #0c1222 100%)',
+    ].join(', '),
+    card: 'rgba(30,27,75,0.45)',
     accent: '#8b5cf6',
     accentHover: '#7c3aed',
     accentSoft: 'rgba(139,92,246,0.15)',
@@ -84,8 +131,14 @@ const THEMES = {
   },
   enthusiastic: {
     label: 'Enthusiastic',
-    bg: 'linear-gradient(160deg, #fff7ed 0%, #ffedd5 40%, #fef3c7 70%, #fffbeb 100%)',
-    card: '#ffffff',
+    bg: [
+      'radial-gradient(circle at 50% 0%, rgba(251,191,36,0.22) 0%, transparent 50%)',
+      'radial-gradient(circle at 85% 75%, rgba(251,146,60,0.18) 0%, transparent 45%)',
+      'radial-gradient(circle at 15% 55%, rgba(252,211,77,0.15) 0%, transparent 40%)',
+      'radial-gradient(circle at 60% 90%, rgba(249,115,22,0.1) 0%, transparent 35%)',
+      'linear-gradient(160deg, #fff7ed 0%, #ffedd5 30%, #fef3c7 60%, #fffbeb 100%)',
+    ].join(', '),
+    card: 'rgba(255,255,255,0.88)',
     accent: '#f97316',
     accentHover: '#ea580c',
     accentSoft: '#ffedd5',
@@ -101,7 +154,60 @@ const THEMES = {
   },
 }
 
-export default function PatientChat({ patientModeUser, backendAvailable, onRegister, theme = 'floral' }) {
+/* ── Decorative background elements per theme ───────────────────── */
+function ThemeDecor({ theme }) {
+  const base = { position: 'absolute', pointerEvents: 'none', borderRadius: '50%' }
+
+  if (theme === 'floral') {
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+        {/* Large organic petal shapes */}
+        <div style={{ ...base, width: 340, height: 340, borderRadius: '62% 38% 28% 72% / 58% 32% 68% 42%', background: 'rgba(249,168,212,0.14)', filter: 'blur(45px)', top: -90, right: -70 }} />
+        <div style={{ ...base, width: 280, height: 280, borderRadius: '38% 62% 72% 28% / 42% 68% 32% 58%', background: 'rgba(251,207,232,0.2)', filter: 'blur(40px)', bottom: -50, left: -50 }} />
+        <div style={{ ...base, width: 200, height: 200, borderRadius: '50% 50% 30% 70% / 60% 40% 60% 40%', background: 'rgba(244,114,182,0.1)', filter: 'blur(30px)', top: '30%', left: '10%' }} />
+        <div style={{ ...base, width: 150, height: 150, background: 'rgba(232,121,249,0.08)', filter: 'blur(25px)', top: '15%', right: '20%' }} />
+        <div style={{ ...base, width: 120, height: 100, borderRadius: '70% 30% 50% 50% / 40% 60% 40% 60%', background: 'rgba(236,72,153,0.06)', filter: 'blur(20px)', bottom: '20%', right: '10%' }} />
+        {/* Small petal accents */}
+        <div style={{ ...base, width: 60, height: 60, background: 'rgba(249,168,212,0.15)', filter: 'blur(8px)', top: '55%', left: '50%' }} />
+        <div style={{ ...base, width: 40, height: 40, background: 'rgba(244,114,182,0.12)', filter: 'blur(6px)', top: '70%', left: '25%' }} />
+      </div>
+    )
+  }
+
+  if (theme === 'starryNight') {
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+        {/* Nebula clouds */}
+        <div style={{ ...base, width: 420, height: 320, background: 'radial-gradient(ellipse, rgba(88,28,135,0.22) 0%, transparent 70%)', filter: 'blur(50px)', top: -40, right: -100 }} />
+        <div style={{ ...base, width: 380, height: 280, background: 'radial-gradient(ellipse, rgba(30,58,138,0.28) 0%, transparent 70%)', filter: 'blur(45px)', bottom: 30, left: -80 }} />
+        <div style={{ ...base, width: 250, height: 200, background: 'radial-gradient(ellipse, rgba(67,56,202,0.15) 0%, transparent 70%)', filter: 'blur(35px)', top: '40%', right: '15%' }} />
+        {/* Moon glow */}
+        <div style={{ ...base, width: 90, height: 90, background: 'radial-gradient(circle, rgba(253,230,138,0.14) 0%, rgba(253,230,138,0.05) 50%, transparent 70%)', top: 50, right: 70 }} />
+        <div style={{ ...base, width: 40, height: 40, background: 'radial-gradient(circle, rgba(253,230,138,0.25) 0%, transparent 70%)', top: 75, right: 95 }} />
+      </div>
+    )
+  }
+
+  if (theme === 'enthusiastic') {
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+        {/* Sunburst glow */}
+        <div style={{ ...base, width: 550, height: 550, background: 'radial-gradient(circle, rgba(251,191,36,0.16) 0%, rgba(251,191,36,0.04) 40%, transparent 60%)', top: -250, left: '50%', transform: 'translateX(-50%)' }} />
+        {/* Warm orbs */}
+        <div style={{ ...base, width: 260, height: 260, background: 'rgba(251,146,60,0.1)', filter: 'blur(35px)', bottom: -60, right: -40 }} />
+        <div style={{ ...base, width: 180, height: 180, background: 'rgba(252,211,77,0.12)', filter: 'blur(28px)', top: '35%', left: -30 }} />
+        <div style={{ ...base, width: 120, height: 120, background: 'rgba(249,115,22,0.08)', filter: 'blur(20px)', bottom: '25%', left: '55%' }} />
+        {/* Bright small accents */}
+        <div style={{ ...base, width: 50, height: 50, background: 'rgba(251,191,36,0.18)', filter: 'blur(10px)', top: '20%', right: '25%' }} />
+        <div style={{ ...base, width: 35, height: 35, background: 'rgba(251,146,60,0.15)', filter: 'blur(8px)', bottom: '40%', left: '30%' }} />
+      </div>
+    )
+  }
+
+  return null
+}
+
+export default function PatientChat({ patientModeUser, backendAvailable, onRegister, theme = 'default' }) {
   const [regName, setRegName] = useState('')
   const [regIntro, setRegIntro] = useState('')
   const [messages, setMessages] = useState([
@@ -118,7 +224,7 @@ export default function PatientChat({ patientModeUser, backendAvailable, onRegis
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const t = THEMES[theme] || THEMES.floral
+  const t = THEMES[theme] || THEMES.default
 
   const themeVars = {
     '--theme-accent': t.accent,
@@ -128,8 +234,10 @@ export default function PatientChat({ patientModeUser, backendAvailable, onRegis
 
   const breatheStyle = {
     backgroundColor: t.breathe,
-    boxShadow: theme === 'starryNight' ? `0 0 24px ${t.breathe}50` : 'none',
+    boxShadow: theme === 'starryNight' ? `0 0 28px ${t.breathe}55` : 'none',
   }
+
+  const containerClass = `flex-1 flex flex-col items-center relative overflow-hidden isolate ${theme !== 'default' ? `theme-${theme}` : ''}`
 
   const send = async () => {
     if (!input.trim() || sending) return
@@ -167,10 +275,9 @@ export default function PatientChat({ patientModeUser, backendAvailable, onRegis
   /* ── Registration ──────────────────────────────────────────────── */
   if (!patientModeUser) {
     return (
-      <div
-        className={`flex-1 flex flex-col items-center justify-center relative overflow-hidden isolate theme-${theme}`}
-        style={{ background: t.bg, ...themeVars }}
-      >
+      <div className={`${containerClass} justify-center`} style={{ background: t.bg, ...themeVars }}>
+        <ThemeDecor theme={theme} />
+
         <div className="w-full max-w-sm px-4 relative z-10">
           <div className="flex justify-center mb-6">
             <div className="w-14 h-14 rounded-full animate-breathe" style={breatheStyle} />
@@ -202,7 +309,7 @@ export default function PatientChat({ patientModeUser, backendAvailable, onRegis
 
             <div className="mb-5">
               <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: t.muted }}>
-                Brief intro <span className="font-normal normal-case tracking-normal" style={{ color: t.muted, opacity: 0.65 }}>(optional)</span>
+                Brief intro <span className="font-normal normal-case tracking-normal" style={{ opacity: 0.65 }}>(optional)</span>
               </label>
               <textarea
                 value={regIntro}
@@ -235,10 +342,9 @@ export default function PatientChat({ patientModeUser, backendAvailable, onRegis
   /* ── Scheduler ─────────────────────────────────────────────────── */
   if (showScheduler) {
     return (
-      <div
-        className={`flex-1 flex flex-col items-center overflow-y-auto relative isolate theme-${theme}`}
-        style={{ background: t.bg, ...themeVars }}
-      >
+      <div className={`${containerClass} overflow-y-auto`} style={{ background: t.bg, ...themeVars }}>
+        <ThemeDecor theme={theme} />
+
         <div className="w-full max-w-md px-4 pt-8 pb-8 relative z-10">
           <button
             onClick={() => { setShowScheduler(false); setSelectedDay(null); setBookedSlot(null) }}
@@ -346,10 +452,9 @@ export default function PatientChat({ patientModeUser, backendAvailable, onRegis
 
   /* ── Chat ───────────────────────────────────────────────────────── */
   return (
-    <div
-      className={`flex-1 flex flex-col items-center relative overflow-hidden isolate theme-${theme}`}
-      style={{ background: t.bg, ...themeVars }}
-    >
+    <div className={containerClass} style={{ background: t.bg, ...themeVars }}>
+      <ThemeDecor theme={theme} />
+
       {/* Breathing circle */}
       <div className="pt-8 pb-2 relative z-10">
         <div className="w-14 h-14 rounded-full animate-breathe" style={breatheStyle} />

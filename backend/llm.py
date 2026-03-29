@@ -1,9 +1,15 @@
 """
 LLM abstraction layer.
 
-Defines a simple interface for generating responses. Ships with a mock
-implementation and an OpenAI-compatible implementation that reads
-OPENAI_API_BASE and OPENAI_API_KEY from the environment.
+Defines a provider interface for generating chat responses. Two implementations:
+
+- OpenAILLM: Calls Anthropic's OpenAI-compatible endpoint using ANTHROPIC_API_KEY
+  and ANTHROPIC_MODEL from backend/.env. Sends the full conversation history
+  (system prompt + all prior messages) on every request.
+- MockLLM: Returns template-aware canned responses for offline testing.
+
+The module-level `llm` instance is auto-selected at import time based on
+whether ANTHROPIC_API_KEY is set.
 """
 
 import os
@@ -131,7 +137,7 @@ class MockLLM(LLMProvider):
 
 
 # ── Active provider ────────────────────────────────────────────
-# Uses OpenAI-compatible API if OPENAI_API_KEY is set, otherwise MockLLM.
+# Uses Anthropic API if ANTHROPIC_API_KEY is set, otherwise MockLLM.
 
 if os.environ.get("ANTHROPIC_API_KEY"):
     llm = OpenAILLM()

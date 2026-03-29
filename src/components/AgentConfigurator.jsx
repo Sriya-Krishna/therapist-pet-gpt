@@ -1,3 +1,19 @@
+/**
+ * Full-page agent configuration editor for a single patient.
+ *
+ * Left pane — config form:
+ *   1. Template selector (5 archetypes from mock.js/agentTemplates)
+ *   2. Tone sliders: warmth, directness, verbosity (1–10 each)
+ *   3. Response style toggles (e.g. "Cognitive reframing", "Active listening")
+ *   4. Boundary checklist + custom boundary input
+ *
+ * Right pane — live preview:
+ *   Shows a mock agent reply for a test message and a summary of the
+ *   current config (template, tone values, styles, boundary count).
+ *
+ * On save, the config is passed to App.jsx → api.updateAgent() → backend.
+ */
+
 import { useState } from 'react'
 import { ArrowLeft, Save } from 'lucide-react'
 import { agentTemplates, responseStyles, safetyBoundaries } from '../data/mock'

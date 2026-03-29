@@ -1,3 +1,12 @@
+/**
+ * Fallback data used when the backend is unreachable.
+ *
+ * Mirrors the seed data in backend/seed.py so the frontend can render
+ * a fully populated UI without running the server. Also exports
+ * agentTemplates, responseStyles, safetyBoundaries, and
+ * defaultMasterPrompt which are used by the AgentConfigurator.
+ */
+
 export const patients = [
   {
     id: 'elena',

@@ -1,3 +1,17 @@
+/**
+ * Right sidebar showing details for the selected patient.
+ *
+ * Sections (top to bottom):
+ *   - Patient name, status, last active
+ *   - AI-generated summary
+ *   - Recent signals (up to 4, with type-colored dots)
+ *   - Sub-agent config (template, tone bars W/D/V, styles, boundary count)
+ *   - Therapist recommendation
+ *   - "Schedule session" button
+ *
+ * The "Edit in Agents" link navigates to the AgentConfigurator for this patient.
+ */
+
 import { Bot, CalendarPlus } from 'lucide-react'
 
 const statusText = {

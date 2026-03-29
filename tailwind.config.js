@@ -1,4 +1,10 @@
-/** @type {import('tailwindcss').Config} */
+/**
+ * Tailwind config — extends the default palette with a custom sage green scale
+ * (sage-50 through sage-900) used as the primary brand color throughout the UI.
+ * Uses Inter as the default font and includes the @tailwindcss/forms plugin.
+ *
+ * @type {import('tailwindcss').Config}
+ */
 export default {
   content: [
     "./index.html",

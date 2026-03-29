@@ -1,3 +1,11 @@
+/**
+ * Therapist-side conversation transcript for the selected patient.
+ *
+ * Messages are grouped by date with dividers. Agent messages align left
+ * (sage bubble), patient messages align right (stone bubble). Flagged
+ * messages show a red flag icon and a red ring highlight.
+ */
+
 import { Users, Flag } from 'lucide-react'
 
 export default function Workspace({ patient }) {
