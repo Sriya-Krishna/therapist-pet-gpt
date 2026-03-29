@@ -48,6 +48,19 @@ class Patient(Base):
     def set_agent(self, config: dict | None):
         self.agent_config = json.dumps(config) if config else None
 
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "initials": self.initials,
+            "status": self.status,
+            "lastActive": self.last_active,
+            "summary": self.summary,
+            "recommendation": self.recommendation,
+            "agent": self.get_agent(),
+            "messages": [m.to_dict() for m in self.messages],
+        }
+
 
 class Message(Base):
     __tablename__ = "messages"
@@ -60,6 +73,15 @@ class Message(Base):
     flagged = Column(Boolean, default=False)
 
     patient = relationship("Patient", back_populates="messages")
+
+    def to_dict(self) -> dict:
+        return {
+            "from": self.from_role,
+            "text": self.text,
+            "time": self.time,
+            "date": self.date,
+            "flagged": self.flagged,
+        }
 
 
 class Signal(Base):
@@ -76,6 +98,19 @@ class Signal(Base):
 
     patient = relationship("Patient", back_populates="signals")
 
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "patientId": self.patient_id,
+            "patientName": self.patient_name,
+            "type": self.type,
+            "text": self.text,
+            "detail": self.detail,
+            "time": self.time,
+            "date": self.date,
+            "acknowledged": self.acknowledged,
+        }
+
 
 class Appointment(Base):
     __tablename__ = "appointments"
@@ -89,6 +124,20 @@ class Appointment(Base):
     start_time = Column(String, nullable=False)
     end_time = Column(String, nullable=False)
     status = Column(String, nullable=False, default="upcoming")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "patientId": self.patient_id,
+            "patientName": self.patient_name,
+            "initials": self.initials,
+            "patientStatus": self.patient_status,
+            "type": self.type,
+            "date": self.date,
+            "startTime": self.start_time,
+            "endTime": self.end_time,
+            "status": self.status,
+        }
 
 
 # ── DB lifecycle ───────────────────────────────────────────────

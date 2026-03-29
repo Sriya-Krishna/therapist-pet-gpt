@@ -1,0 +1,13 @@
+node_modules
+dist
+.vite
+__pycache__
+*.pyc
+backend/__pycache__
+backend/*.db
+.env
+backend/.env
+.git
+.idea
+*.swp
+.DS_Store

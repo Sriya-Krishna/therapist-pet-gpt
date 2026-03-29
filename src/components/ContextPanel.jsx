@@ -13,21 +13,7 @@
  */
 
 import { Bot, CalendarPlus } from 'lucide-react'
-
-const statusText = {
-  crisis: 'text-red-700',
-  warning: 'text-amber-700',
-  active: 'text-emerald-700',
-  quiet: 'text-stone-500',
-  new: 'text-sky-600',
-}
-
-const signalDot = {
-  critical: 'bg-red-500',
-  warning: 'bg-amber-500',
-  positive: 'bg-emerald-500',
-  info: 'bg-sky-400',
-}
+import { patientStatusText, signalDot } from '../constants/statusColors'
 
 export default function ContextPanel({ patient, signals, onConfigureAgent }) {
   return (
@@ -35,7 +21,7 @@ export default function ContextPanel({ patient, signals, onConfigureAgent }) {
       <div className="px-5 py-4 border-b border-stone-100">
         <div className="flex items-center gap-2">
           <span className="text-[15px] font-semibold text-stone-800">{patient.name}</span>
-          <span className={`text-[10px] font-semibold uppercase tracking-wider ${statusText[patient.status]}`}>
+          <span className={`text-[10px] font-semibold uppercase tracking-wider ${patientStatusText[patient.status]}`}>
             {patient.status}
           </span>
         </div>

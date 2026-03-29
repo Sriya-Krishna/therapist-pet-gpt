@@ -8,14 +8,7 @@
  */
 
 import { Plus } from 'lucide-react'
-
-const statusColors = {
-  crisis: { border: 'border-l-red-500', text: 'text-red-700' },
-  warning: { border: 'border-l-amber-500', text: 'text-amber-700' },
-  active: { border: 'border-l-emerald-500', text: 'text-emerald-700' },
-  quiet: { border: 'border-l-stone-400', text: 'text-stone-500' },
-  new: { border: 'border-l-sky-400', text: 'text-sky-600' },
-}
+import { patientStatusBorder, patientStatusText } from '../constants/statusColors'
 
 export default function PatientList({ patients, selectedId, onSelect, signals, onAddPatient }) {
   const activeToday = patients.filter(p => p.lastActive.includes('Today')).length
@@ -40,7 +33,6 @@ export default function PatientList({ patients, selectedId, onSelect, signals, o
 
       <div className="flex-1 overflow-y-auto">
         {patients.map(p => {
-          const sc = statusColors[p.status]
           const isSelected = selectedId === p.id
           return (
             <div
@@ -49,14 +41,14 @@ export default function PatientList({ patients, selectedId, onSelect, signals, o
               className={`px-4 py-3 border-l-[3px] border-b border-b-stone-100/80 cursor-pointer transition-colors duration-100 ${
                 isSelected
                   ? 'bg-sage-50/60 border-l-sage-500'
-                  : `${sc.border} hover:bg-stone-50/80`
+                  : `${patientStatusBorder[p.status]} hover:bg-stone-50/80`
               }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className={`text-[13px] font-medium ${isSelected ? 'text-sage-800' : 'text-stone-800'}`}>
                   {p.name}
                 </span>
-                <span className={`text-[10px] font-medium uppercase tracking-wider ${isSelected ? 'text-sage-600' : sc.text}`}>
+                <span className={`text-[10px] font-medium uppercase tracking-wider ${isSelected ? 'text-sage-600' : patientStatusText[p.status]}`}>
                   {p.status}
                 </span>
               </div>

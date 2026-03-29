@@ -9,117 +9,113 @@ Each sub-agent operates under the therapist's predefined rules, ensuring that pa
 
 Instead of having unsafe convos with chatgpt this can be a safer alternative.
 
-## Project Overview
+# MindBridge
 
-MindBridge is an AI-assisted mental wellness platform prototype. A therapist configures AI sub-agents per patient (personality, tone, boundaries). The AI mediates patient conversations, generates summaries, and surfaces signals to the therapist. The AI never provides clinical solutions — its behavior is entirely shaped by the therapist.
+An AI-assisted mental wellness platform where therapists configure per-patient AI sub-agents. The AI mediates patient conversations under the therapist's full control — it never diagnoses, prescribes, or provides clinical advice.
 
+## What's Built
 
+**Therapist dashboard**
+- Patient list with status indicators (crisis, warning, active, quiet, new)
+- Conversation transcript viewer with flagged-message highlighting
+- Context panel: AI summary, recent signals, agent config overview, recommendations
+- Calendar with day-by-day appointment schedule
+- Master prompt editor — base instructions inherited by every patient agent
 
-## Commands
+**Agent configuration**
+- 5 personality templates: Steady anchor, Structured guide, Reflective guide, Perspective shifter, Soft presence
+- Tone sliders: warmth, directness, verbosity (1–10 each), translated to concrete behavioral instructions
+- Response style toggles (grounding techniques, cognitive reframing, motivational interviewing, etc.)
+- Custom boundary rules with a preset safety checklist
 
-### Frontend (Vite + React)
+**Prompt assembly pipeline**
+- 7-layer system prompt built at inference time: master prompt → bridge text → template → tone → styles → boundaries → patient context
+- Boundaries are positioned late in the prompt so they act as final authority
+- `python -m prompts.demo` prints assembled prompts for two contrasting agents
+
+**Patient chat**
+- Real-time chat powered by Anthropic Claude (via OpenAI-compatible API)
+- Full conversation history sent to the LLM on each request
+- Falls back to a MockLLM with template-aware canned responses when no API key is set
+- Self-registration flow for new patients
+- Session scheduling UI (client-side mockup)
+- 4 visual themes: Default, Floral, Starry Night, Enthusiastic
+
+**Signals feed**
+- AI observations across all patients (critical, warning, positive, info)
+- Acknowledge workflow — signals dim after acknowledgment
+
+## Not Yet Implemented
+
+- AI-generated patient summaries (currently static seed data)
+- Real appointment booking (scheduler is a client-side mockup)
+- Authentication / user accounts
+- Conversation history cap (all messages are sent to the LLM — no truncation yet)
+
+## Getting Started
+
+### Frontend
 ```bash
-npm install              # Install frontend dependencies
-npm run dev              # Start dev server (http://localhost:5173)
-npm run build            # Production build to dist/
-npm run preview          # Preview production build
+npm install
+npm run dev              # http://localhost:5173
 ```
 
-### Backend (FastAPI)
+### Backend
 ```bash
 cd backend
 pip install -r requirements.txt
-python seed.py           # First run only — creates and seeds mindbridge.db
+cp .env.example .env     # add your ANTHROPIC_API_KEY
+python seed.py           # first run only — creates mindbridge.db
 uvicorn main:app --reload --port 8000
 ```
 
-### Prompt debugging
+The frontend works without the backend (falls back to mock data), but chat responses require the backend running. Without an `ANTHROPIC_API_KEY`, the backend uses MockLLM.
+
+### Docker
+
+Run the entire app as a single container:
+
 ```bash
-cd backend
-python -m prompts.demo   # Print assembled prompts for two contrasting agents
+# Make sure backend/.env has your ANTHROPIC_API_KEY, then:
+docker compose up --build
 ```
 
+The app will be available at `http://localhost:8000`.
 
+Or without Compose:
+
+```bash
+docker build -t mindbridge .
+docker run -p 8000:8000 --env-file backend/.env mindbridge
+```
+
+The Docker image uses a multi-stage build: Node builds the frontend, then Python serves both the API and the static files. The database is seeded automatically on first start.
 
 ## Tech Stack
 
-- **Frontend**: Vite + React 19 + Tailwind CSS 3 + Lucide React icons. Inter font via Google Fonts.
-- **Backend**: FastAPI + SQLAlchemy ORM + SQLite (`backend/mindbridge.db`). Pydantic for request validation. python-dotenv loads `backend/.env`.
-- **LLM**: Abstracted via `backend/llm.py`. Uses Anthropic's OpenAI-compatible API (`ANTHROPIC_API_KEY` in `.env`). Falls back to `MockLLM` if no key is set.
+- **Frontend**: React 19, Vite, Tailwind CSS 3, Lucide React
+- **Backend**: FastAPI, SQLAlchemy, SQLite, python-dotenv
+- **LLM**: Anthropic Claude via OpenAI-compatible API (`backend/llm.py`)
 
-Vite proxies `/api` requests to `localhost:8000`. CORS is configured for `localhost:5173` only.
-
-## Architecture
-
-### Frontend: Top Bar + Three Panels
-
-The app uses a horizontal top navigation bar (`TopBar`) with three content views, plus a persona toggle to swap into patient mode. The logo acts as a home button (deselects patient, navigates to patients view).
+## Project Structure
 
 ```
-TopBar:  [Logo=Home]  [Patients] [Agents] [Signals]  [Theme dropdown]  [Patient view]
-Content: [PatientList | TherapistHome]                — default (no patient selected)
-         [PatientList | Workspace | ContextPanel]     — patient selected
-         [AgentsGrid]                                 — Agents view
-         [SignalsFeed]                                — Signals view
-         [PatientChat]                                — Patient mode
-         [AgentConfigurator]                          — overlay when configuring
-         [AddPatientModal]                            — overlay when adding patient
+src/
+  App.jsx              — root state, view routing, API data loading
+  api.js               — REST client (proxied to backend via Vite)
+  data/mock.js         — fallback data when backend is offline
+  components/          — 10 React components (see file headers for docs)
+
+backend/
+  main.py              — FastAPI app, all /api/ endpoints
+  db.py                — SQLAlchemy models (Patient, Message, Signal, etc.)
+  llm.py               — LLM provider abstraction (Anthropic + MockLLM)
+  seed.py              — database seeder with 6 patients, signals, appointments
+  prompts/
+    templates.py       — 5 personality archetypes
+    tone.py            — slider-to-instruction translator
+    assemble.py        — 7-layer prompt composer
+    demo.py            — prints assembled prompts for debugging
 ```
 
-Frontend state lives in `App.jsx` and flows down via props. On mount it fetches from the backend API (`src/api.js`); if the backend is unreachable it falls back to `src/data/mock.js`.
-
-
-
-### Backend: REST API + Prompt Pipeline
-
-`backend/main.py` is the FastAPI app. All endpoints under `/api/`. Key routes:
-- `GET/POST /api/patients` — list / create
-- `PUT /api/patients/{id}/agent` — update agent config
-- `GET/PUT /api/master-prompt` — global master prompt
-- `POST /api/chat/{patient_id}` — the core chat pipeline (assembles prompt, calls LLM, persists messages)
-- `GET /api/signals`, `PUT /api/signals/{id}/acknowledge`
-- `GET /api/appointments?date=YYYY-MM-DD`
-
-Database models in `backend/db.py`: `Patient`, `Message`, `Signal`, `Appointment`, `Setting`. Patient agent config is stored as a JSON string column (`agent_config`) with `get_agent()`/`set_agent()` helpers.
-
-### Prompt Assembly Pipeline (`backend/prompts/`)
-
-This is the core non-obvious architecture. The system prompt is built in layers (order matters):
-
-1. **Master prompt** (`Setting` table) — therapist's base instructions, inviolable
-2. **Bridge text** — explicit instruction that foundation overrides everything below
-3. **Template personality** (`prompts/templates.py`) — one of 5 archetypes: `anchor`, `structured`, `reflective`, `perspective`, `soft`
-4. **Tone calibration** (`prompts/tone.py`) — translates numeric sliders (warmth/directness/verbosity, each 1-10) into behavioral instructions
-5. **Response styles** — techniques to use naturally (not a checklist)
-6. **Boundaries** — hard constraints that override everything above
-7. **Patient context** — summary + recent signals (last so LLM has it freshest)
-
-Sections are joined with `---` separators. Boundaries come late intentionally so they act as final authority. `prompts/demo.py` prints assembled prompts for two contrasting agents to verify the pipeline.
-
-### LLM Integration
-
-`backend/llm.py` reads `ANTHROPIC_API_KEY` and optionally `ANTHROPIC_MODEL` (default: `claude-sonnet-4-20250514`) from `backend/.env` via python-dotenv. It calls Anthropic's OpenAI-compatible endpoint (`https://api.anthropic.com/v1/chat/completions`). The chat endpoint sends the full conversation history per patient to the LLM on every request.
-
-The `MockLLM` detects which template is active by scanning the system prompt text, then returns a random response from a matching pool. This lets you test the full pipeline without API credits.
-
-
-
-### Design System
-
-- **Primary**: sage green (`sage-500: #4A7C6F`) — custom color in `tailwind.config.js`
-- **Neutrals**: Tailwind `stone-*` (warm tones)
-- **Status colors**: red (crisis), amber (warning), emerald (active), stone (quiet), sky (new)
-- **Signal types**: critical (red), warning (amber), positive (emerald), info (sky)
-- **Form inputs**: `text-[12px]` therapist-side, `text-[14px]` patient-side, sage focus rings
-- **Modals**: fixed z-50 overlay with black/20 backdrop, click-outside-to-close
-
-### Crisis Detection
-
-Handled via the LLM prompt at inference time, not client-side. The frontend does not perform keyword matching.
-
-
-## Key Design Decisions
-
-- The frontend and backend hold duplicate seed data (mock.js vs SQLite). The frontend fetches from the API when available but falls back to mock.js if the backend is down.
-- The chat endpoint returns `systemPrompt` in its response for debugging — this should be removed in production.
-- Patient themes are purely client-side (CSS/inline styles). Theme selection is not persisted to the backend.
+See [CLAUDE.md](CLAUDE.md) for detailed architecture notes.

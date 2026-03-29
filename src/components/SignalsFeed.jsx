@@ -8,20 +8,7 @@
  */
 
 import { Check } from 'lucide-react'
-
-const dotColor = {
-  critical: 'bg-red-500',
-  warning: 'bg-amber-500',
-  positive: 'bg-emerald-500',
-  info: 'bg-sky-400',
-}
-
-const labelColor = {
-  critical: 'text-red-700 bg-red-50',
-  warning: 'text-amber-700 bg-amber-50',
-  positive: 'text-emerald-700 bg-emerald-50',
-  info: 'text-sky-700 bg-sky-50',
-}
+import { signalDot, signalLabel } from '../constants/statusColors'
 
 export default function SignalsFeed({ signals, onAcknowledge }) {
   const grouped = {}
@@ -53,10 +40,10 @@ export default function SignalsFeed({ signals, onAcknowledge }) {
                     s.acknowledged ? 'opacity-45' : 'bg-white border border-stone-200/60'
                   }`}
                 >
-                  <div className={`w-2 h-2 rounded-full mt-[7px] shrink-0 ${dotColor[s.type]}`} />
+                  <div className={`w-2 h-2 rounded-full mt-[7px] shrink-0 ${signalDot[s.type]}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-[10px] font-medium rounded-full px-2 py-0.5 ${labelColor[s.type]}`}>
+                      <span className={`text-[10px] font-medium rounded-full px-2 py-0.5 ${signalLabel[s.type]}`}>
                         {s.type}
                       </span>
                       <span className="text-[12px] font-medium text-stone-700">{s.patientName}</span>

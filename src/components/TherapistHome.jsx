@@ -15,16 +15,9 @@ import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { appointments as fallbackAppointments } from '../data/mock'
 import * as api from '../api'
+import { patientStatusStyle } from '../constants/statusColors'
 
 const TODAY = '2026-03-29'
-
-const patientStatusStyle = {
-  crisis:  { avatar: 'bg-red-100 text-red-700',    badge: 'bg-red-100 text-red-700',    dot: 'bg-red-400'    },
-  warning: { avatar: 'bg-amber-100 text-amber-700', badge: 'bg-amber-100 text-amber-700', dot: 'bg-amber-400'  },
-  active:  { avatar: 'bg-emerald-100 text-emerald-700', badge: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-400' },
-  quiet:   { avatar: 'bg-stone-100 text-stone-600', badge: 'bg-stone-100 text-stone-600', dot: 'bg-stone-400'  },
-  new:     { avatar: 'bg-sky-100 text-sky-700',     badge: 'bg-sky-100 text-sky-700',     dot: 'bg-sky-400'    },
-}
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']

@@ -25,10 +25,6 @@ export function getPatients() {
   return request('/patients')
 }
 
-export function getPatient(id) {
-  return request(`/patients/${id}`)
-}
-
 export function createPatient(name, note = '') {
   return request('/patients', {
     method: 'POST',
