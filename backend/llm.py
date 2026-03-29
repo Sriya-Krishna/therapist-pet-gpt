@@ -61,7 +61,13 @@ class OpenAILLM(LLMProvider):
             },
         )
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        data = resp.json()
+        print(f"[LLM] Response keys: {list(data.keys())}")
+        try:
+            return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError):
+            print(f"[LLM] Unexpected response body: {data}")
+            raise
 
 
 class MockLLM(LLMProvider):
