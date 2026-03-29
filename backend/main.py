@@ -74,6 +74,13 @@ class MasterPromptUpdate(BaseModel):
 class ChatMessage(BaseModel):
     text: str
 
+class AppointmentCreate(BaseModel):
+    patientId: str
+    type: str = "Session"
+    date: str
+    startTime: str
+    endTime: str
+
 
 # ── Helpers ────────────────────────────────────────────────────
 
@@ -97,6 +104,19 @@ def commit(db: Session):
 
 def derive_initials(name: str) -> str:
     return "".join(w[0] for w in name.strip().split()).upper()[:2]
+
+
+def llm_json(system_prompt: str, user_content: str):
+    """Call the LLM and parse the response as JSON.
+
+    Handles markdown code fences that LLMs sometimes wrap JSON in.
+    Returns the parsed Python object (list or dict), or None on failure.
+    """
+    raw = llm.generate(system_prompt, [{"role": "user", "content": user_content}])
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+    return json.loads(cleaned)
 
 
 # ── Default agent for unconfigured patients ───────────────────
@@ -143,21 +163,12 @@ def extract_signals(patient_message: str, agent_response: str, patient_name: str
     Fails silently — signal extraction must never break the chat flow.
     """
     try:
-        extraction_messages = [
-            {"role": "user", "content": (
-                f"Patient ({patient_name}) said: \"{patient_message}\"\n\n"
-                f"Agent responded: \"{agent_response}\"\n\n"
-                "Extract any clinical signals as a JSON array."
-            )}
-        ]
-        raw = llm.generate(SIGNAL_EXTRACTION_PROMPT, extraction_messages)
-
-        # Parse JSON — handle markdown code fences the LLM might wrap it in
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-
-        signals = json.loads(cleaned)
+        signals = llm_json(
+            SIGNAL_EXTRACTION_PROMPT,
+            f"Patient ({patient_name}) said: \"{patient_message}\"\n\n"
+            f"Agent responded: \"{agent_response}\"\n\n"
+            "Extract any clinical signals as a JSON array.",
+        )
 
         if not isinstance(signals, list):
             log.warning("Signal extraction returned non-list: %s", type(signals))
@@ -183,8 +194,7 @@ def extract_signals(patient_message: str, agent_response: str, patient_name: str
             log.info("Extracted %d signal(s) for patient %s", len(signals), patient_id)
 
     except json.JSONDecodeError as e:
-        log.warning("Signal extraction JSON parse failed for %s: %s (raw: %s)",
-                    patient_id, e, raw[:200] if 'raw' in dir() else "N/A")
+        log.warning("Signal extraction JSON parse failed for %s: %s", patient_id, e)
     except Exception as e:
         log.warning("Signal extraction failed for %s: %s", patient_id, e)
 
@@ -212,24 +222,18 @@ def update_patient_summary(patient, db):
         return
 
     try:
-        recent = patient.messages[-20:]  # last 20 messages for context
+        recent = patient.messages[-20:]
         transcript = "\n".join(
             f"{'Patient' if m.from_role == 'patient' else 'Agent'}: {m.text}"
             for m in recent
         )
-        messages = [{"role": "user", "content": (
+        result = llm_json(
+            SUMMARY_PROMPT,
             f"Patient: {patient.name}\n"
             f"Current status: {patient.status}\n\n"
             f"Recent conversation:\n{transcript}\n\n"
-            "Generate a clinical summary and recommendation."
-        )}]
-        raw = llm.generate(SUMMARY_PROMPT, messages)
-
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-
-        result = json.loads(cleaned)
+            "Generate a clinical summary and recommendation.",
+        )
         if isinstance(result, dict):
             if "summary" in result:
                 patient.summary = result["summary"]
@@ -319,18 +323,12 @@ def verify_boundaries(response_text: str, boundaries: list[str], patient_name: s
 
     try:
         boundary_list = "\n".join(f"- {b}" for b in boundaries)
-        messages = [{"role": "user", "content": (
+        results = llm_json(
+            BOUNDARY_VERIFY_PROMPT,
             f"Agent response: \"{response_text}\"\n\n"
             f"Boundaries:\n{boundary_list}\n\n"
-            "Check each boundary. Return a JSON array."
-        )}]
-        raw = llm.generate(BOUNDARY_VERIFY_PROMPT, messages)
-
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-
-        results = json.loads(cleaned)
+            "Check each boundary. Return a JSON array.",
+        )
         if not isinstance(results, list):
             log.warning("Boundary verifier returned non-list for %s", patient_id)
             return []
@@ -457,10 +455,12 @@ def chat(patient_id: str, body: ChatMessage, db: Session = Depends(get_db)):
         ],
     )
 
-    # Build conversation history for the LLM
+    # Build conversation history for the LLM (capped to avoid token overflow)
+    MAX_HISTORY = 50
+    recent_messages = patient.messages[-MAX_HISTORY:]
     conversation = [
         {"role": "user" if m.from_role == "patient" else "assistant", "content": m.text}
-        for m in patient.messages
+        for m in recent_messages
     ]
     conversation.append({"role": "user", "content": body.text})
 
@@ -581,6 +581,25 @@ def list_appointments(date: str | None = None, db: Session = Depends(get_db)):
     if date:
         q = q.filter(Appointment.date == date)
     return [a.to_dict() for a in q.order_by(Appointment.date, Appointment.start_time).all()]
+
+
+@app.post("/api/appointments", status_code=201)
+def create_appointment(body: AppointmentCreate, db: Session = Depends(get_db)):
+    patient = get_or_404(db, Patient, id=body.patientId)
+    appt = Appointment(
+        patient_id=patient.id,
+        patient_name=patient.name,
+        initials=patient.initials,
+        patient_status=patient.status,
+        type=body.type,
+        date=body.date,
+        start_time=body.startTime,
+        end_time=body.endTime,
+        status="upcoming",
+    )
+    db.add(appt)
+    commit(db)
+    return appt.to_dict()
 
 
 # ── Static frontend (Docker production build) ─────────────────

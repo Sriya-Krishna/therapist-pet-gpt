@@ -6,7 +6,7 @@ mindbridge.db file. The database is created and seeded on first run.
 """
 
 import json
-from sqlalchemy import create_engine, Column, String, Integer, Float, Boolean, Text, ForeignKey
+from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 DATABASE_URL = "sqlite:///mindbridge.db"
